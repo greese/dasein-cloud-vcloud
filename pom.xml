@@ -58,6 +58,7 @@
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>
+
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
