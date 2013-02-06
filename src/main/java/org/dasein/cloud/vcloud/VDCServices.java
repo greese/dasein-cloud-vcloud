@@ -1,32 +1,45 @@
 /**
- * ========= CONFIDENTIAL =========
- *
- * Copyright (C) 2012 enStratus Networks Inc - ALL RIGHTS RESERVED
+ * Copyright (C) 2009-2013 enStratus Networks Inc
  *
  * ====================================================================
- *  NOTICE: All information contained herein is, and remains the
- *  property of enStratus Networks Inc. The intellectual and technical
- *  concepts contained herein are proprietary to enStratus Networks Inc
- *  and may be covered by U.S. and Foreign Patents, patents in process,
- *  and are protected by trade secret or copyright law. Dissemination
- *  of this information or reproduction of this material is strictly
- *  forbidden unless prior written permission is obtained from
- *  enStratus Networks Inc.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  * ====================================================================
  */
+
 package org.dasein.cloud.vcloud;
 
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.dc.DataCenterServices;
 import org.dasein.cloud.dc.Region;
+import org.dasein.cloud.util.APITrace;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Locale;
 
 /**
- * vCloud VDC support to describe the data centers in a specific vCloud-based cloud.
+ * vCloud VDC support to describe the data centers in a specific vCloud-based cloud. Dasein Cloud maps your
+ * vCloud organization to both an accountNumber and a Dasein Cloud region. Dasein Cloud data centers map to
+ * vCloud VDCs. There's a further nuance in the ID format of regions and data centers. They can take the format
+ * /org/ORG_ID and /vdc/VDC_ID, respectively, OR they can simply be ORG_ID and VDC_ID respectively. By default,
+ * the {@link Region#getProviderRegionId()} == ORG_ID. However, if the {@link ProviderContext#getCustomProperties()}
+ * property "compat" or system property "vCloudCompat" are set to true, Dasein Cloud will mimic the old
+ * Dasein Cloud + jclouds behavior in which {@link Region#getProviderRegionId()} == /org/ORG_ID.
  * <p>Created by George Reese: 9/17/12 11:00 AM</p>
  * @author George Reese
  * @version 2012.09 initial version
@@ -37,32 +50,77 @@ public class VDCServices implements DataCenterServices {
 
     VDCServices(vCloud provider) { this.provider = provider; }
 
-    public DataCenter getDataCenter(String providerDataCenterId) throws InternalException, CloudException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    @Override
+    public @Nullable DataCenter getDataCenter(@Nonnull String providerDataCenterId) throws InternalException, CloudException {
+        APITrace.begin(provider, "getDataCenter");
+        try {
+            for( Region region : listRegions() ) {
+                for( DataCenter dc : listDataCenters(region.getProviderRegionId()) ) {
+                    if( providerDataCenterId.equals(dc.getProviderDataCenterId()) ) {
+                        return dc;
+                    }
+                }
+            }
+            return null;
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
-    public String getProviderTermForDataCenter(Locale locale) {
-        return "VDC Unit";
-    }
-
-    public String getProviderTermForRegion(Locale locale) {
+    @Override
+    public @Nonnull String getProviderTermForDataCenter(@Nonnull Locale locale) {
         return "VDC";
     }
 
-    public Region getRegion(String providerRegionId) throws InternalException, CloudException {
-        for( Region region : listRegions() ) {
-            if( providerRegionId.equals(region.getProviderRegionId()) ) {
-                return region;
+    @Override
+    public @Nonnull String getProviderTermForRegion(@Nonnull Locale locale) {
+        return "Org";
+    }
+
+    @Override
+    public @Nullable Region getRegion(@Nonnull String providerRegionId) throws InternalException, CloudException {
+        APITrace.begin(provider, "getRegion");
+        try {
+            for( Region region : listRegions() ) {
+                if( providerRegionId.equals(region.getProviderRegionId()) ) {
+                    return region;
+                }
             }
+            return null;
         }
-        return null;
+        finally {
+            APITrace.end();
+        }
     }
 
-    public Collection<DataCenter> listDataCenters(String providerRegionId) throws InternalException, CloudException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    @Override
+    public @Nonnull Collection<DataCenter> listDataCenters(@Nonnull String providerRegionId) throws InternalException, CloudException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new CloudException("No context was specified for this request");
+        }
+        if( !providerRegionId.equals(ctx.getRegionId()) ) {
+            return Collections.emptyList();
+        }
+        APITrace.begin(provider, "listDataCenters");
+        try {
+            return (new vCloudMethod(provider)).listDataCenters();
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
-    public Collection<Region> listRegions() throws InternalException, CloudException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    @Override
+    public @Nonnull Collection<Region> listRegions() throws InternalException, CloudException {
+        APITrace.begin(provider, "listRegions");
+        try {
+            return Collections.singletonList((new vCloudMethod(provider)).getRegion());
+        }
+        finally {
+            APITrace.end();
+        }
     }
 }

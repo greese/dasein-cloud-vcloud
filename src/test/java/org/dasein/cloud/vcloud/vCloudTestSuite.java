@@ -16,30 +16,20 @@
  * ====================================================================
  */
 
-package org.dasein.cloud.vcloud.compute;
+package org.dasein.cloud.vcloud;
 
-import org.dasein.cloud.CloudProvider;
-import org.dasein.cloud.compute.AbstractComputeServices;
-import org.dasein.cloud.vcloud.vCloud;
-
-import javax.annotation.Nonnull;
+import junit.framework.Test;
+import org.dasein.cloud.test.ComprehensiveTestSuite;
+import org.dasein.cloud.test.TestConfigurationException;
 
 /**
- * Dasein Cloud compute services for vCloud Director.
- * <p>Created by George Reese: 9/17/12 10:58 AM</p>
+ * [Class Documentation]
+ * <p>Created by George Reese: 2/5/13 3:46 PM</p>
+ *
  * @author George Reese
- * @since 2013.04
- * @version 2013.04 initial version
  */
-public class vCloudComputeServices extends AbstractComputeServices {
-    private vCloud provider;
-
-    public vCloudComputeServices(@Nonnull vCloud provider) {
-        this.provider = provider;
-    }
-
-    @Override
-    public @Nonnull TemplateSupport getImageSupport() {
-        return new TemplateSupport(provider);
+public class vCloudTestSuite {
+    static public Test suite() throws TestConfigurationException {
+        return new ComprehensiveTestSuite(vCloud.class);
     }
 }

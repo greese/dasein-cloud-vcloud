@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-vcloud</artifactId>
-  <version>2012.09-SNAPSHOT</version>
+  <version>2013.04-SNAPSHOT</version>
   <name>Dasein Cloud vCloud</name>
   <description>Dasein Cloud implementation for the vCloud API</description>
   
@@ -40,17 +40,10 @@
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2012.09</version>
+        <version>2013.04-SNAPSHOT</version>
         <scope>compile</scope>
         <optional>false</optional>
-    </dependency> 
-    <dependency>
-        <groupId>org.dasein</groupId>
-        <artifactId>dasein-cloud-test</artifactId>
-        <version>2012.09</version>
-        <scope>test</scope>
-        <optional>false</optional>
-    </dependency>      
+    </dependency>
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-util</artifactId>
@@ -58,18 +51,11 @@
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>
-
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.9</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-        <groupId>commons-httpclient</groupId>
-        <artifactId>commons-httpclient</artifactId>
-        <version>3.1</version>
-    </dependency>
+      <dependency>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpclient</artifactId>
+          <version>4.2.1</version>
+      </dependency>
     <dependency>
         <groupId>log4j</groupId>
         <artifactId>log4j</artifactId>
@@ -84,11 +70,20 @@
     	<type>jar</type>
     	<scope>compile</scope>
     </dependency>
+
+      <!-- Test -->
       <dependency>
-          <groupId>org.json</groupId>
-          <artifactId>json</artifactId>
-          <version>20090211</version>
-          <scope>compile</scope>
+          <groupId>org.dasein</groupId>
+          <artifactId>dasein-cloud-test</artifactId>
+          <version>2013.04-SNAPSHOT</version>
+          <scope>test</scope>
+          <optional>false</optional>
+      </dependency>
+      <dependency>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+          <version>4.9</version>
+          <scope>test</scope>
       </dependency>
   </dependencies>
   
@@ -146,7 +141,7 @@
                     <exclude>**/LICENSE-APACHE.txt</exclude>
                 </excludes>
                 <properties>
-                    <year>2009-2012</year>
+                    <year>2009-2013</year>
                     <copyrightHolder>enStratus Networks Inc</copyrightHolder>
                 </properties>
             </configuration>
@@ -223,9 +218,13 @@
                     <name>test.product</name>
                     <value>${test.product}</value>
                 </property>
+                <property>
+                    <name>vCloudCompat</name>
+                    <value>${compat}</value>
+                </property>
             </systemProperties>
           <includes>
-            <!-- <include>**/vCloudTestSuite.java</include> -->
+            <include>**/vCloudTestSuite.java</include>
           </includes>
         </configuration>
       </plugin>     
