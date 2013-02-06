@@ -27,12 +27,14 @@ import org.apache.http.StatusLine;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.conn.ssl.TrustStrategy;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpParams;
@@ -49,6 +51,7 @@ import org.dasein.cloud.dc.Region;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
+import org.dasein.util.CalendarWrapper;
 import org.dasein.util.uom.time.Day;
 import org.dasein.util.uom.time.TimePeriod;
 import org.dasein.util.uom.time.Minute;
@@ -75,6 +78,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.TreeSet;
@@ -87,6 +91,8 @@ import java.util.TreeSet;
  */
 public class vCloudMethod {
     static public final String[] VERSIONS = { "5.1", "1.5", "1.0", "0.9", "0.8" };
+
+    static public final String INSTANTIATE_VAPP = "instantiateVApp";
 
     static public boolean isSupported(@Nonnull String version) {
         for( String v : VERSIONS ) {
@@ -132,8 +138,9 @@ public class vCloudMethod {
         public String  token;
         public String  endpoint;
         public Version version;
-        public Collection<DataCenter> vdcs;
         public Region region;
+        public String url;
+        public Iterable<VDC> vdcs;
     }
 
     static public class Version {
@@ -141,6 +148,13 @@ public class vCloudMethod {
         public String version;
 
         public String toString() { return (version + " [" + loginUrl + "]"); }
+    }
+
+    static public class VDC {
+        public DataCenter dataCenter;
+        public HashMap<String,String> actions;
+        public int vmQuota = -2;
+        public int networkQuota = -2;
     }
 
     private vCloud provider;
@@ -258,7 +272,7 @@ public class vCloudMethod {
 
                                                 org.endpoint = url.substring(0, url.lastIndexOf("/api/org"));
                                                 org.region = region;
-                                                loadVDCs(url, org);
+                                                org.url = url;
                                             }
                                         }
                                     }
@@ -294,7 +308,7 @@ public class vCloudMethod {
                                         region.setName(name == null ? accountNumber : name.getNodeValue().trim());
                                         org.endpoint = url.substring(0, url.lastIndexOf("/org/"));
                                         org.region = region;
-                                        loadVDCs(url, org);
+                                        org.url = url;
                                     }
                                 }
                             }
@@ -340,6 +354,7 @@ public class vCloudMethod {
                     throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), "No Org", "No org was identified for " + ctx.getAccountNumber());
                 }
                 cache.put(ctx, Collections.singletonList(org));
+                loadVDCs(org);
                 return org;
             }
             finally {
@@ -354,32 +369,111 @@ public class vCloudMethod {
         }
     }
 
+    public void delete(@Nonnull String resource, @Nonnull String id) throws CloudException, InternalException {
+        if( logger.isTraceEnabled() ) {
+            logger.trace("ENTER: " + vCloudMethod.class.getName() + ".delete(" + resource + "," + id + ")");
+        }
+        try {
+            Org org = authenticate(false);
+            String endpoint = toURL(resource, id);
+
+            if( wire.isDebugEnabled() ) {
+                wire.debug("");
+                wire.debug(">>> [DELETE (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
+            }
+            try {
+                HttpClient client = getClient(false);
+                HttpDelete delete = new HttpDelete(endpoint);
+
+                delete.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
+                delete.addHeader("x-vcloud-authorization", org.token);
+
+                if( wire.isDebugEnabled() ) {
+                    wire.debug(delete.getRequestLine().toString());
+                    for( Header header : delete.getAllHeaders() ) {
+                        wire.debug(header.getName() + ": " + header.getValue());
+                    }
+                    wire.debug("");
+                }
+                HttpResponse response;
+
+                try {
+                    APITrace.trace(provider, "DELETE " + resource);
+                    response = client.execute(delete);
+                    if( wire.isDebugEnabled() ) {
+                        wire.debug(response.getStatusLine().toString());
+                        for( Header header : response.getAllHeaders() ) {
+                            wire.debug(header.getName() + ": " + header.getValue());
+                        }
+                        wire.debug("");
+                    }
+                }
+                catch( IOException e ) {
+                    logger.error("I/O error from server communications: " + e.getMessage());
+                    e.printStackTrace();
+                    throw new InternalException(e);
+                }
+                int code = response.getStatusLine().getStatusCode();
+
+                logger.debug("HTTP STATUS: " + code);
+
+                if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
+                    authenticate(true);
+                    delete(resource, id);
+                }
+                else if( code != HttpServletResponse.SC_NOT_FOUND && code != HttpServletResponse.SC_NO_CONTENT && code != HttpServletResponse.SC_OK && code != HttpServletResponse.SC_ACCEPTED ) {
+                    logger.error("DELETE request got unexpected " + code);
+                    String xml = null;
+
+                    try {
+                        HttpEntity entity = response.getEntity();
+
+                        if( entity != null ) {
+                            xml = EntityUtils.toString(entity);
+                            if( wire.isDebugEnabled() ) {
+                                wire.debug(xml);
+                                wire.debug("");
+                            }
+                        }
+                    }
+                    catch( IOException e ) {
+                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
+                        e.printStackTrace();
+                        throw new CloudException(e);
+                    }
+
+                    vCloudException.Data data = vCloudException.parseException(code, xml);
+
+                    if( data == null ) {
+                        throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+                    }
+                    logger.error("[" +  code + " : " + data.title + "] " + data.description);
+                    throw new vCloudException(data);
+                }
+            }
+            finally {
+                if( wire.isDebugEnabled() ) {
+                    wire.debug("<<< [DELETE (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
+                    wire.debug("");
+                }
+            }
+        }
+        finally {
+            if( logger.isTraceEnabled() ) {
+                logger.trace("EXIT: " + vCloudMethod.class.getName() + ".delete()");
+            }
+
+        }
+    }
+
     public @Nullable String get(@Nonnull String resource, @Nullable String id) throws CloudException, InternalException {
         if( logger.isTraceEnabled() ) {
             logger.trace("ENTER: " + vCloudMethod.class.getName() + ".get(" + resource + "," + id + ")");
         }
         try {
             Org org = authenticate(false);
-            String endpoint;
+            String endpoint = toURL(resource, id);
 
-            if( id == null ) {
-                if( matches(org.version.version, "1.5", null) ) {
-                    endpoint = org.endpoint + "/api/" + resource;
-                }
-                else {
-                    endpoint = org.endpoint + "/api/v" + org.version.version + "/" + resource;
-                }
-            }
-            else {
-                String r = (provider.isCompat() ? id : ("/" + resource + "/" + id));
-
-                if( matches(org.version.version, "1.5", null) ) {
-                    endpoint = org.endpoint + "/api" + r;
-                }
-                else {
-                    endpoint = org.endpoint + "/api/v" + org.version.version + r;
-                }
-            }
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug(">>> [GET (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
@@ -495,6 +589,13 @@ public class vCloudMethod {
 
         }
     }
+
+    public @Nonnull String getAction(@Nonnull String endpoint) {
+        String[] parts = endpoint.split("/");
+
+        return parts[parts.length-1];
+    }
+
     protected @Nonnull HttpClient getClient(boolean forAuthentication) throws CloudException, InternalException {
         ProviderContext ctx = provider.getContext();
 
@@ -572,6 +673,18 @@ public class vCloudMethod {
         return client;
     }
 
+    public @Nonnull String getMediaTypeForActionInstantiateVApp() {
+        return "application/vnd.vmware.vcloud.instantiateVAppTemplateParams+xml";
+    }
+
+    public @Nonnull String getMediaTypeForActionDeployVApp() {
+        return ">application/vnd.vmware.vcloud.deployVAppParams+xml";
+    }
+
+    public @Nonnull String getMediaTypeForActionUndeployVApp() {
+        return ">application/vnd.vmware.vcloud.undeployVAppParams+xml";
+    }
+
     public @Nonnull String getMediaTypeForCatalog() {
         return "application/vnd.vmware.vcloud.catalog+xml";
     }
@@ -582,6 +695,24 @@ public class vCloudMethod {
 
     public @Nonnull String getMediaTypeForVDC() {
         return "application/vnd.vmware.vcloud.vdc+xml";
+    }
+
+    public int getNetworkQuota() throws CloudException, InternalException {
+        int quota =-2;
+
+        for( VDC vdc : authenticate(false).vdcs ) {
+            int q = vdc.networkQuota;
+
+            if( q > -1 ) {
+                if( quota == -2 ) {
+                    quota = q;
+                }
+                else {
+                    quota += q;
+                }
+            }
+        }
+        return quota;
     }
 
     public @Nonnull String getOrgName(@Nonnull String href) throws CloudException, InternalException {
@@ -625,7 +756,7 @@ public class vCloudMethod {
         {
             Iterable<Version> versions = cache.get(ctx);
 
-            System.out.println("VERSION from " + cache + ": " + versions);
+
             Iterator<Version> it = (versions == null ? null : versions.iterator());
 
             if( it != null && it.hasNext() ) {
@@ -797,18 +928,95 @@ public class vCloudMethod {
         }
     }
 
-    public Collection<DataCenter> listDataCenters() throws CloudException, InternalException {
-        return Collections.unmodifiableCollection(authenticate(false).vdcs);
+    public int getVMQuota() throws CloudException, InternalException {
+        int quota =-2;
+
+        for( VDC vdc : authenticate(false).vdcs ) {
+            int q = vdc.vmQuota;
+
+            if( q > -1 ) {
+                if( quota == -2 ) {
+                    quota = q;
+                }
+                else {
+                    quota += q;
+                }
+            }
+        }
+        return quota;
     }
 
-    private void loadVDCs(@Nonnull String url, @Nonnull Org org) throws CloudException, InternalException {
+    public Collection<DataCenter> listDataCenters() throws CloudException, InternalException {
+        ArrayList<DataCenter> dcs = new ArrayList<DataCenter>();
+
+        for( VDC vdc : authenticate(false).vdcs ) {
+            dcs.add(vdc.dataCenter);
+        }
+        return dcs;
+    }
+
+    private void loadVDC(@Nonnull VDC vdc, @Nonnull String id) throws CloudException, InternalException {
+        String xml = get("vdc", id);
+
+        if( xml != null ) {
+            NodeList vdcs = parseXML(xml).getElementsByTagName("Vdc");
+
+            if( vdcs.getLength() < 1 ) {
+                return;
+            }
+            NodeList attributes = vdcs.item(0).getChildNodes();
+
+            for( int i=0; i<attributes.getLength(); i++ ) {
+                Node attribute = attributes.item(i);
+
+                if( attribute.getNodeName().equalsIgnoreCase("Link") && attribute.hasAttributes() ) {
+                    Node rel = attribute.getAttributes().getNamedItem("rel");
+
+                    if( rel.getNodeValue().trim().equalsIgnoreCase("add") ) {
+                        Node type = attribute.getAttributes().getNamedItem("type");
+                        Node href = attribute.getAttributes().getNamedItem("href");
+
+                        if( type != null && href != null ) {
+                            vdc.actions.put(type.getNodeValue().trim(), href.getNodeValue().trim());
+                        }
+                    }
+                }
+                else if( attribute.getNodeName().equalsIgnoreCase("VmQuota") && attribute.hasChildNodes() ) {
+                    try {
+                        vdc.vmQuota = Integer.parseInt(attribute.getFirstChild().getNodeValue().trim());
+                    }
+                    catch( NumberFormatException ignore ) {
+                        // ignore
+                    }
+                }
+                else if( attribute.getNodeName().equalsIgnoreCase("NetworkQuota") && attribute.hasChildNodes() ) {
+                    try {
+                        vdc.networkQuota = Integer.parseInt(attribute.getFirstChild().getNodeValue().trim());
+                    }
+                    catch( NumberFormatException ignore ) {
+                        // ignore
+                    }
+                }
+                else if( attribute.getNodeName().equalsIgnoreCase("IsEnabled") && attribute.hasChildNodes() ) {
+                    boolean enabled = attribute.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
+
+                    if( !enabled ) {
+                        vdc.dataCenter.setActive(false);
+                        vdc.dataCenter.setAvailable(false);
+                    }
+                }
+            }
+        }
+    }
+
+    private void loadVDCs(@Nonnull Org org) throws CloudException, InternalException {
         if( wire.isDebugEnabled() ) {
             wire.debug("");
-            wire.debug(">>> [GET (" + (new Date()) + ")] -> " + url + " >--------------------------------------------------------------------------------------");
+            wire.debug(">>> [GET (" + (new Date()) + ")] -> " + org.url + " >--------------------------------------------------------------------------------------");
         }
         try {
             HttpClient client = getClient(false);
-            HttpGet method =  new HttpGet(url);
+            HttpGet method =  new HttpGet(org.url);
 
             method.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
             method.addHeader("x-vcloud-authorization", org.token);
@@ -857,7 +1065,7 @@ public class vCloudMethod {
 
                     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
                     DocumentBuilder parser = factory.newDocumentBuilder();
-                    ArrayList<DataCenter> dcs = new ArrayList<DataCenter>();
+                    ArrayList<VDC> vdcs = new ArrayList<VDC>();
                     Document doc = parser.parse(bas);
                     bas.close();
 
@@ -874,7 +1082,9 @@ public class vCloudMethod {
 
                                 if( name != null ) {
                                     DataCenter dc = new DataCenter();
+                                    VDC vdc = new VDC();
 
+                                    vdc.actions = new HashMap<String, String>();
                                     dc.setActive(true);
                                     dc.setAvailable(true);
                                     dc.setName(name.getNodeValue().trim());
@@ -882,29 +1092,18 @@ public class vCloudMethod {
                                     Node href = link.getAttributes().getNamedItem("href");
 
                                     if( href != null ) {
-                                        String t = href.getNodeValue().trim();
-                                        int idx = t.lastIndexOf('/');
-                                        String id;
+                                        String id = provider.toID(href.getNodeValue().trim());
 
-                                        if( idx > -1 ) {
-                                            id = t.substring(idx + 1);
-                                        }
-                                        else {
-                                            id = t;
-                                        }
-                                        if( provider.isCompat() ) {
-                                            dc.setProviderDataCenterId("/vdc/" + id);
-                                        }
-                                        else {
-                                            dc.setProviderDataCenterId(id);
-                                        }
-                                        dcs.add(dc);
+                                        dc.setProviderDataCenterId(id);
+                                        vdc.dataCenter = dc;
+                                        loadVDC(vdc, id);
+                                        vdcs.add(vdc);
                                     }
                                 }
                             }
                         }
                     }
-                    org.vdcs = dcs;
+                    org.vdcs = vdcs;
                 }
                 catch( IOException e ) {
                     throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
@@ -948,10 +1147,33 @@ public class vCloudMethod {
         }
         finally {
             if( wire.isDebugEnabled() ) {
-                wire.debug("<<< [GET (" + (new Date()) + ")] -> " + url + " <--------------------------------------------------------------------------------------");
+                wire.debug("<<< [GET (" + (new Date()) + ")] -> " + org.url + " <--------------------------------------------------------------------------------------");
                 wire.debug("");
             }
         }
+    }
+
+    public void parseError(@Nonnull Node errorNode) throws CloudException {
+        NodeList attributes = errorNode.getChildNodes();
+        CloudErrorType type = CloudErrorType.GENERAL;
+        String message = "Unknown";
+        String major = "";
+        String minor = "";
+
+        for( int i=0; i<attributes.getLength(); i++ ) {
+            Node attr = attributes.item(i);
+
+            if( attr.getNodeName().equalsIgnoreCase("message") && attr.hasChildNodes() ) {
+                message = attr.getFirstChild().getNodeValue().trim();
+            }
+            else if( attr.getNodeName().equalsIgnoreCase("majorErrorCode") && attr.hasChildNodes() ) {
+                major = attr.getFirstChild().getNodeValue().trim();
+            }
+            else if( attr.getNodeName().equalsIgnoreCase("minorErrorCode") && attr.hasChildNodes() ) {
+                minor = attr.getFirstChild().getNodeValue().trim();
+            }
+        }
+        throw new CloudException(type, 200, major + ":" + minor, message);
     }
 
     public @Nonnull Document parseXML(@Nonnull String xml) throws CloudException, InternalException {
@@ -972,5 +1194,270 @@ public class vCloudMethod {
         catch( IOException e ) {
             throw new InternalException(e);
         }
+    }
+
+    public @Nonnull String post(@Nonnull String action, @Nullable String vdcId, @Nullable String payload) throws CloudException, InternalException {
+        if( logger.isTraceEnabled() ) {
+            logger.trace("ENTER: " + vCloudMethod.class.getName() + ".post(" + action + ")");
+        }
+        try {
+            Org org = authenticate(false);
+            String endpoint = null;
+            VDC vdc = null;
+
+            for( VDC v : org.vdcs ) {
+                if( vdcId == null ) {
+                    vdc = v;
+                    break;
+                }
+                else if( v.dataCenter.getProviderDataCenterId().equals(vdcId) ) {
+                    vdc = v;
+                    break;
+                }
+                else if( vdc == null ) {
+                    vdc = v;
+                }
+            }
+            if( vdc == null ) {
+                throw new CloudException("No VDC was identified for this request (requested " + vdcId + ")");
+            }
+            String contentType;
+
+            if( action.equals(INSTANTIATE_VAPP) ) {
+                contentType = getMediaTypeForActionInstantiateVApp();
+                endpoint = vdc.actions.get(contentType);
+            }
+            if( endpoint == null) {
+                throw new CloudException("No endpoint for " + action);
+            }
+            return post(action, endpoint, payload);
+        }
+        finally {
+            if( logger.isTraceEnabled() ) {
+                logger.trace("EXIT: " + vCloudMethod.class.getName() + ".post()");
+            }
+        }
+    }
+
+    public @Nonnull String post(@Nonnull String action, @Nonnull String endpoint, @Nullable String contentType, @Nullable String payload) throws CloudException, InternalException {
+        if( logger.isTraceEnabled() ) {
+            logger.trace("ENTER: " + vCloudMethod.class.getName() + ".post(" + endpoint + ")");
+        }
+        try {
+            if( wire.isDebugEnabled() ) {
+                wire.debug("");
+                wire.debug(">>> [POST (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
+            }
+            try {
+                Org org = authenticate(false);
+                HttpClient client = getClient(false);
+                HttpPost post = new HttpPost(endpoint);
+
+                post.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
+                post.addHeader("x-vcloud-authorization", org.token);
+                if( contentType != null ) {
+                    post.addHeader("ContentType", contentType);
+                }
+
+                if( wire.isDebugEnabled() ) {
+                    wire.debug(post.getRequestLine().toString());
+                    for( Header header : post.getAllHeaders() ) {
+                        wire.debug(header.getName() + ": " + header.getValue());
+                    }
+                    wire.debug("");
+                }
+                if( payload != null ) {
+                    try {
+                        //noinspection deprecation
+                        post.setEntity(new StringEntity(payload == null ? "" : payload, "application/json", "UTF-8"));
+                    }
+                    catch( UnsupportedEncodingException e ) {
+                        throw new InternalException(e);
+                    }
+                    try { wire.debug(EntityUtils.toString(post.getEntity())); }
+                    catch( IOException ignore ) { }
+
+                    wire.debug("");
+                }
+                HttpResponse response;
+
+                try {
+                    APITrace.trace(provider, "POST " + action);
+                    response = client.execute(post);
+                    if( wire.isDebugEnabled() ) {
+                        wire.debug(response.getStatusLine().toString());
+                        for( Header header : response.getAllHeaders() ) {
+                            wire.debug(header.getName() + ": " + header.getValue());
+                        }
+                        wire.debug("");
+                    }
+                }
+                catch( IOException e ) {
+                    logger.error("I/O error from server communications: " + e.getMessage());
+                    e.printStackTrace();
+                    throw new InternalException(e);
+                }
+                int code = response.getStatusLine().getStatusCode();
+
+                logger.debug("HTTP STATUS: " + code);
+
+                if( code == HttpServletResponse.SC_NOT_FOUND ) {
+                    throw new CloudException("No action match for " + endpoint);
+                }
+                else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
+                    authenticate(true);
+                    return post(action, endpoint, contentType, payload);
+                }
+                else if( code == HttpServletResponse.SC_NO_CONTENT ) {
+                    return "";
+                }
+                else if( code == HttpServletResponse.SC_OK || code == HttpServletResponse.SC_CREATED || code == HttpServletResponse.SC_ACCEPTED ) {
+                    String xml = null;
+
+                    try {
+                        HttpEntity entity = response.getEntity();
+
+                        if( entity != null ) {
+                            xml = EntityUtils.toString(entity);
+                            if( wire.isDebugEnabled() ) {
+                                wire.debug(xml);
+                                wire.debug("");
+                            }
+                        }
+                    }
+                    catch( IOException e ) {
+                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
+                        e.printStackTrace();
+                        throw new CloudException(e);
+                    }
+                    return xml;
+                }
+                else {
+                    logger.error("Expected OK or CREATED or NO_CONTENT or ACCEPTED for POST request, got " + code);
+                    String xml = null;
+
+                    try {
+                        HttpEntity entity = response.getEntity();
+
+                        if( entity != null ) {
+                            xml = EntityUtils.toString(entity);
+                            if( wire.isDebugEnabled() ) {
+                                wire.debug(xml);
+                                wire.debug("");
+                            }
+                        }
+                    }
+                    catch( IOException e ) {
+                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
+                        e.printStackTrace();
+                        throw new CloudException(e);
+                    }
+
+                    vCloudException.Data data = vCloudException.parseException(code, xml);
+
+                    if( data == null ) {
+                        throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+                    }
+                    logger.error("[" +  code + " : " + data.title + "] " + data.description);
+                    throw new vCloudException(data);
+                }
+            }
+            finally {
+                if( wire.isDebugEnabled() ) {
+                    wire.debug("<<< [POST (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
+                    wire.debug("");
+                }
+            }
+        }
+        finally {
+            if( logger.isTraceEnabled() ) {
+                logger.trace("EXIT: " + vCloudMethod.class.getName() + ".post()");
+            }
+        }
+    }
+
+    public @Nonnull String toURL(@Nonnull String resource, @Nullable String id) throws CloudException, InternalException {
+        Org org = authenticate(false);
+        String url;
+
+        if( id == null ) {
+            if( matches(org.version.version, "1.5", null) ) {
+                url = org.endpoint + "/api/" + resource;
+            }
+            else {
+                url = org.endpoint + "/api/v" + org.version.version + "/" + resource;
+            }
+        }
+        else {
+            String r = (provider.isCompat() ? id : ("/" + resource + "/" + id));
+
+            if( matches(org.version.version, "1.5", null) ) {
+                url = org.endpoint + "/api" + r;
+            }
+            else {
+                url = org.endpoint + "/api/v" + org.version.version + r;
+            }
+        }
+        return url;
+    }
+
+    public void waitFor(@Nullable String xmlTask) throws CloudException {
+        long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 30L);
+        String taskId = null;
+
+        while( timeout > System.currentTimeMillis() ) {
+            if( xmlTask == null || xmlTask.equals("") ) {
+                return;
+            }
+            NodeList tasks;
+
+            try {
+                tasks = parseXML(xmlTask).getElementsByTagName("Task");
+            }
+            catch( Throwable ignore ) {
+                return;
+            }
+            if( tasks.getLength() < 1 ) {
+                return;
+            }
+            Node task = tasks.item(0);
+
+            if( task.hasAttributes() ) {
+                Node status = task.getAttributes().getNamedItem("status");
+
+                if( status != null ) {
+                    String s = status.getNodeValue().trim();
+
+                    if( s.equals("success") ) {
+                        return;
+                    }
+                    else if( s.equals("error") ) {
+                        NodeList elements = task.getChildNodes();
+
+                        for( int i=0; i<elements.getLength(); i++ ) {
+                            Node element = elements.item(i);
+
+                            if( element.getNodeName().equalsIgnoreCase("Error") ) {
+                                parseError(element);
+                                return;
+                            }
+                        }
+                    }
+                }
+                if( taskId == null ) {
+                    Node href = task.getAttributes().getNamedItem("href");
+
+                    if( href == null ) {
+                        return;
+                    }
+                    taskId = provider.toID(href.getNodeValue().trim());
+                }
+            }
+            try { Thread.sleep(15000L); }
+            catch( InterruptedException ignore ) { }
+            try { xmlTask = get("task", taskId); }
+            catch( Throwable ignore ) { }
+        }
+        logger.warn("Task timed out: " + taskId);
     }
 }

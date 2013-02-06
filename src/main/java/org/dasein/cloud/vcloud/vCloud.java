@@ -71,6 +71,26 @@ public class vCloud extends AbstractCloud {
         return Logger.getLogger("dasein.cloud.vcloud.wire." + getLastItem(cls.getPackage().getName()) + "." + getLastItem(cls.getName()));
     }
 
+    static public String escapeXml(String nonxml) {
+        StringBuilder str = new StringBuilder();
+
+        for( int i=0; i<nonxml.length(); i++ ) {
+            char c = nonxml.charAt(i);
+
+            switch( c ) {
+                case '&': str.append("&amp;"); break;
+                case '>': str.append("&gt;"); break;
+                case '<': str.append("&lt;"); break;
+                case '"': str.append("&quot;"); break;
+                case '[': str.append("&#091;"); break;
+                case ']': str.append("&#093;"); break;
+                case '!': str.append("&#033;"); break;
+                default: str.append(c);
+            }
+        }
+        return str.toString();
+    }
+
     public vCloud() { }
 
     @Override
@@ -128,6 +148,33 @@ public class vCloud extends AbstractCloud {
         else {
             return new String[] { value };
         }
+    }
+
+
+    public @Nonnull String getVMProductsResource() {
+        ProviderContext ctx = getContext();
+        String value;
+
+        if( ctx == null ) {
+            value = null;
+        }
+        else {
+            Properties p = ctx.getCustomProperties();
+
+            if( p == null ) {
+                value = null;
+            }
+            else {
+                value = p.getProperty("vmproducts");
+            }
+        }
+        if( value == null ) {
+            value = System.getProperty("vcloud.vmproducts");
+        }
+        if( value == null ) {
+            value = "/org/dasein/cloud/vcloud/vmproducts.json";
+        }
+        return value;
     }
 
     public boolean isCompat() {

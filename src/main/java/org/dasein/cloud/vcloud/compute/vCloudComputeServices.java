@@ -42,4 +42,9 @@ public class vCloudComputeServices extends AbstractComputeServices {
     public @Nonnull TemplateSupport getImageSupport() {
         return new TemplateSupport(provider);
     }
+
+    @Override
+    public @Nonnull vAppSupport getVirtualMachineSupport() {
+        return new vAppSupport(provider);
+    }
 }
