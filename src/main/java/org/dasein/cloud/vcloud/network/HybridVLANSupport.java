@@ -3,14 +3,22 @@ package org.dasein.cloud.vcloud.network;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.AbstractVLANSupport;
 import org.dasein.cloud.network.IPVersion;
-import org.dasein.cloud.network.Networkable;
 import org.dasein.cloud.network.VLAN;
+import org.dasein.cloud.network.VLANState;
 import org.dasein.cloud.vcloud.vCloud;
+import org.dasein.cloud.vcloud.vCloudMethod;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
 
 /**
@@ -27,12 +35,21 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public boolean allowsNewVlanCreation() throws CloudException, InternalException {
-        return true;
+        // TODO: change me when implemented
+        return false;
     }
 
     @Override
     public @Nonnull VLAN createVlan(@Nonnull String cidr, @Nonnull String name, @Nonnull String description, @Nonnull String domainName, @Nonnull String[] dnsServers, @Nonnull String[] ntpServers) throws CloudException, InternalException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        // TODO: implement me
+        return super.createVlan(cidr, name, description, domainName, dnsServers, ntpServers);
+    }
+
+    @Override
+    public int getMaxVlanCount() throws CloudException, InternalException {
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+
+        return method.getNetworkQuota();
     }
 
     @Override
@@ -52,7 +69,16 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public VLAN getVlan(@Nonnull String vlanId) throws CloudException, InternalException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+
+        for( DataCenter dc : method.listDataCenters() ) {
+            VLAN vlan = toVlan(dc.getProviderDataCenterId(), vlanId);
+
+            if( vlan != null ) {
+                return vlan;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -62,12 +88,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public boolean isVlanDataCenterConstrained() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public @Nonnull Iterable<Networkable> listResources(@Nonnull String inVlanId) throws CloudException, InternalException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return true;
     }
 
     @Override
@@ -77,16 +98,252 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listVlanStatus() throws CloudException, InternalException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        // TODO: do this more intelligently
+        return super.listVlanStatus();
     }
 
     @Override
     public @Nonnull Iterable<VLAN> listVlans() throws CloudException, InternalException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        ArrayList<VLAN> vlans = new ArrayList<VLAN>();
+
+        for( DataCenter dc : method.listDataCenters() ) {
+            String xml = method.get("vdc", dc.getProviderDataCenterId());
+
+            if( xml != null && !xml.equals("") ) {
+                NodeList vdcs = method.parseXML(xml).getElementsByTagName("Vdc");
+
+                if( vdcs.getLength() > 0 ) {
+                    NodeList attributes = vdcs.item(0).getChildNodes();
+
+                    for( int i=0; i<attributes.getLength(); i++ ) {
+                        Node attribute = attributes.item(i);
+
+                        if( attribute.getNodeName().equalsIgnoreCase("AvailableNetworks") && attribute.hasChildNodes() ) {
+                            NodeList resources = attribute.getChildNodes();
+
+                            for( int j=0; j<resources.getLength(); j++ ) {
+                                Node resource = resources.item(j);
+
+                                if( resource.getNodeName().equalsIgnoreCase("Network") && resource.hasAttributes() ) {
+                                    Node href = resource.getAttributes().getNamedItem("href");
+
+                                    VLAN vlan = toVlan(dc.getProviderDataCenterId(), ((vCloud) getProvider()).toID(href.getNodeValue().trim()));
+
+                                    if( vlan != null ) {
+                                        vlans.add(vlan);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return vlans;
+    }
+
+    private @Nullable VLAN toVlan(@Nonnull String vdcId, @Nonnull String id) throws InternalException, CloudException {
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+
+        String xml = method.get("network", id);
+
+        if( xml == null || xml.equals("") ) {
+            return null;
+        }
+        Document doc = method.parseXML(xml);
+        NodeList nets = doc.getElementsByTagName("OrgVdcNetwork");
+
+        if( nets.getLength() < 1 ) {
+            nets = doc.getElementsByTagName("OrgNetwork");
+        }
+        Node netNode = nets.item(0);
+        NodeList attributes = netNode.getChildNodes();
+        VLAN vlan = new VLAN();
+
+        vlan.setProviderVlanId(id);
+        vlan.setProviderDataCenterId(vdcId);
+        vlan.setProviderRegionId(getContext().getRegionId());
+        vlan.setProviderOwnerId(getContext().getAccountNumber());
+        vlan.setSupportedTraffic(new IPVersion[] { IPVersion.IPV4 });
+        vlan.setCurrentState(VLANState.AVAILABLE);
+
+        Node n;
+
+        /*
+        n = netNode.getAttributes().getNamedItem("status");
+        if( n == null ) {
+            vlan.setCurrentState(VLANState.AVAILABLE);
+        }
+        else {
+            vlan.setCurrentState(toState(n.getNodeValue().trim()));
+        }
+        */
+        n = netNode.getAttributes().getNamedItem("name");
+        if( n != null ) {
+            vlan.setName(n.getNodeValue().trim());
+            vlan.setDescription(n.getNodeValue().trim());
+        }
+
+        HashMap<String,String> tags = new HashMap<String, String>();
+        boolean shared = false;
+
+        for( int i=0; i<attributes.getLength(); i++ ) {
+            Node attribute = attributes.item(i);
+
+            if( attribute.getNodeName().equals("Description") && attribute.hasChildNodes() ) {
+                shared = attribute.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
+            }
+            if( attribute.getNodeName().equals("IsShared") && attribute.hasChildNodes() ) {
+                vlan.setDescription(attribute.getFirstChild().getNodeValue().trim());
+            }
+            else if( attribute.getNodeName().equals("Configuration") && attribute.hasChildNodes() ) {
+                NodeList scopesList = attribute.getChildNodes();
+                String[] dns = new String[10];
+                String fenceMode = null;
+                String gateway = null;
+                String netmask = null;
+                String ipStart = null;
+                String ipEnd = null;
+                String domain = null;
+                boolean enabled = false;
+
+                for( int j=0; j<scopesList.getLength(); j++ ) {
+                    Node scopesNode = scopesList.item(j);
+
+                    if( scopesNode.getNodeName().equalsIgnoreCase("FenceMode") && scopesNode.hasChildNodes() ) {
+                        fenceMode = scopesNode.getFirstChild().getNodeValue().trim();
+                    }
+                    else if( scopesNode.getNodeName().equalsIgnoreCase("IpScopes") && scopesNode.hasChildNodes() ) {
+                        NodeList scopes = scopesNode.getChildNodes();
+
+                        for( int k=0; k<scopes.getLength(); k++ ) {
+                            Node scope = scopes.item(k);
+
+                            if( scope.getNodeName().equalsIgnoreCase("IpScope") && scope.hasChildNodes() ) {
+                                NodeList saList = scope.getChildNodes();
+
+                                for( int l=0; l<saList.getLength(); l++ ) {
+                                    Node sa = saList.item(l);
+
+                                    if( sa.getNodeName().equalsIgnoreCase("Gateway") && sa.hasChildNodes() ) {
+                                        gateway = sa.getFirstChild().getNodeValue().trim();
+                                    }
+                                    else if( sa.getNodeName().equalsIgnoreCase("Netmask") && sa.hasChildNodes() ) {
+                                        netmask = sa.getFirstChild().getNodeValue().trim();
+                                    }
+                                    else if( sa.getNodeName().equalsIgnoreCase("DnsSuffix") && sa.hasChildNodes() ) {
+                                        domain = sa.getFirstChild().getNodeValue().trim();
+                                    }
+                                    else if( sa.getNodeName().startsWith("Dns") && sa.hasChildNodes() ) {
+                                        String ns = sa.getFirstChild().getNodeValue().trim();
+
+                                        if( sa.getNodeName().equals("Dns") ) {
+                                            dns[0] = ns;
+                                        }
+                                        else {
+                                            try {
+                                                int idx = Integer.parseInt(sa.getNodeName().substring(3));
+
+                                                dns[idx] = ns;
+                                            }
+                                            catch( NumberFormatException e ) {
+                                                for(int z=0; i<dns.length; z++ ) {
+                                                    if( dns[z] == null ) {
+                                                        dns[z] = ns;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else if( sa.getNodeName().equalsIgnoreCase("IsEnabled") && sa.hasChildNodes() ) {
+                                        enabled = sa.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
+                                    }
+                                    else if( sa.getNodeName().equalsIgnoreCase("IpRanges") && sa.hasChildNodes() ) {
+                                        NodeList rangesList = sa.getChildNodes();
+
+                                        for( int m=0; m<rangesList.getLength(); m++ ) {
+                                            Node ranges = rangesList.item(m);
+
+                                            if( ranges.getNodeName().equalsIgnoreCase("IpRanges") && ranges.hasChildNodes() ) {
+                                                NodeList rangeList = ranges.getChildNodes();
+
+                                                for( int o=0; o<rangeList.getLength(); o++ ) {
+                                                    Node range = rangeList.item(o);
+
+                                                    if( range.getNodeName().equalsIgnoreCase("IpRange") && range.hasChildNodes() ) {
+                                                        NodeList addresses = range.getChildNodes();
+
+                                                        for( int p=0; p<addresses.getLength(); p++ ) {
+                                                            Node address = addresses.item(p);
+
+                                                            if( address.getNodeName().equalsIgnoreCase("StartAddress") && address.hasChildNodes() ) {
+                                                                ipStart = address.getFirstChild().getNodeValue().trim();
+                                                            }
+                                                            else if( address.getNodeName().equalsIgnoreCase("EndAddress") && address.hasChildNodes() ) {
+                                                                ipEnd = address.getFirstChild().getNodeValue().trim();
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                ArrayList<String> dnsServers = new ArrayList<String>();
+
+                for( String ns : dns ) {
+                    if( ns != null ) {
+                        dnsServers.add(ns);
+                    }
+                }
+                vlan.setDnsServers(dnsServers.toArray(new String[dnsServers.size()]));
+                vlan.setCurrentState(enabled ? VLANState.AVAILABLE : VLANState.PENDING);
+                if( domain != null ) {
+                    vlan.setDomainName(domain);
+                }
+                if( fenceMode != null ) {
+                    // isolated
+                    // bridged
+                    // natRouted
+                    tags.put("fenceMode", fenceMode);
+                }
+                if( gateway != null ) {
+                    tags.put("gateway", gateway);
+                }
+                if( netmask != null ) {
+                    tags.put("netmask", netmask);
+                }
+                if( ipStart != null ) {
+                    tags.put("ipStart", ipStart);
+                }
+                if( ipEnd != null ) {
+                    tags.put("ipEnd", ipEnd);
+                }
+                if( netmask != null && gateway != null ) {
+                    vlan.setCidr(netmask, gateway);
+                }
+            }
+        }
+        tags.put("shared", String.valueOf(shared));
+        if( vlan.getName() == null ) {
+            vlan.setName(vlan.getProviderVlanId());
+        }
+        if( vlan.getDescription() == null ) {
+            vlan.setDescription(vlan.getName());
+        }
+        vlan.setTags(tags);
+        return vlan;
     }
 
     @Override
     public void removeVlan(String vlanId) throws CloudException, InternalException {
-        //To change body of implemented methods use File | Settings | File Templates.
+        // TODO: implement me
+        super.removeVlan(vlanId);
     }
 }

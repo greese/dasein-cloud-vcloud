@@ -514,7 +514,7 @@ public class vCloudMethod {
 
                 logger.debug("HTTP STATUS: " + code);
 
-                if( code == HttpServletResponse.SC_NOT_FOUND ) {
+                if( code == HttpServletResponse.SC_NOT_FOUND || code == HttpServletResponse.SC_FORBIDDEN ) {
                     return null;
                 }
                 else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
