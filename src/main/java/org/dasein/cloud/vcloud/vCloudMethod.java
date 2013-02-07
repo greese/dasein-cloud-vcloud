@@ -693,6 +693,10 @@ public class vCloudMethod {
         return "application/vnd.vmware.vcloud.org+xml";
     }
 
+    public @Nonnull String getMediaTypeForVApp() {
+        return "application/vnd.vmware.vcloud.vApp+xml";
+    }
+
     public @Nonnull String getMediaTypeForVDC() {
         return "application/vnd.vmware.vcloud.vdc+xml";
     }
