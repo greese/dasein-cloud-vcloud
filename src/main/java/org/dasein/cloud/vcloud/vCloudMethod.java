@@ -340,8 +340,15 @@ public class vCloudMethod {
                         catch( IOException e ) {
                             throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                         }
-                        vCloudException.Data data = vCloudException.parseException(status.getStatusCode(), body);
+                        vCloudException.Data data = null;
 
+                        if( body != null && !body.equals("") ) {
+                            NodeList errors = parseXML(body).getElementsByTagName("Error");
+
+                            if( errors.getLength() > 0 ) {
+                                data = vCloudException.parseException(status.getStatusCode(), errors.item(0));
+                            }
+                        }
                         if( data == null ) {
                             throw new vCloudException(CloudErrorType.GENERAL, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
                         }
@@ -442,8 +449,15 @@ public class vCloudMethod {
                         throw new CloudException(e);
                     }
 
-                    vCloudException.Data data = vCloudException.parseException(code, xml);
+                    vCloudException.Data data = null;
 
+                    if( xml != null && !xml.equals("") ) {
+                        NodeList errors = parseXML(xml).getElementsByTagName("Error");
+
+                        if( errors.getLength() > 0 ) {
+                            data = vCloudException.parseException(code, errors.item(0));
+                        }
+                    }
                     if( data == null ) {
                         throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
                     }
@@ -566,8 +580,15 @@ public class vCloudMethod {
                         throw new CloudException(e);
                     }
 
-                    vCloudException.Data data = vCloudException.parseException(code, xml);
+                    vCloudException.Data data = null;
 
+                    if( xml != null && !xml.equals("") ) {
+                        NodeList errors = parseXML(xml).getElementsByTagName("Error");
+
+                        if( errors.getLength() > 0 ) {
+                            data = vCloudException.parseException(code, errors.item(0));
+                        }
+                    }
                     if( data == null ) {
                         throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
                     }
@@ -915,8 +936,15 @@ public class vCloudMethod {
                     throw new CloudException(e);
                 }
 
-                vCloudException.Data data = vCloudException.parseException(status.getStatusCode(), xml);
+                vCloudException.Data data = null;
 
+                if( xml != null && !xml.equals("") ) {
+                    NodeList errors = parseXML(xml).getElementsByTagName("Error");
+
+                    if( errors.getLength() > 0 ) {
+                        data = vCloudException.parseException(status.getStatusCode(), errors.item(0));
+                    }
+                }
                 if( data == null ) {
                     throw new vCloudException(CloudErrorType.GENERAL, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
                 }
@@ -1140,8 +1168,15 @@ public class vCloudMethod {
                     throw new CloudException(e);
                 }
 
-                vCloudException.Data data = vCloudException.parseException(status.getStatusCode(), xml);
+                vCloudException.Data data = null;
 
+                if( xml != null && !xml.equals("") ) {
+                    NodeList errors = parseXML(xml).getElementsByTagName("Error");
+
+                    if( errors.getLength() > 0 ) {
+                        data = vCloudException.parseException(status.getStatusCode(), errors.item(0));
+                    }
+                }
                 if( data == null ) {
                     throw new vCloudException(CloudErrorType.GENERAL, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
                 }
@@ -1164,6 +1199,21 @@ public class vCloudMethod {
         String major = "";
         String minor = "";
 
+        Node n = errorNode.getAttributes().getNamedItem("minorErrorCode");
+
+        if( n != null ) {
+            minor = n.getNodeValue().trim();
+        }
+        n = errorNode.getAttributes().getNamedItem("majorErrorCode");
+
+        if( n != null ) {
+            major = n.getNodeValue().trim();
+        }
+        n = errorNode.getAttributes().getNamedItem("message");
+
+        if( n != null ) {
+            message = n.getNodeValue().trim();
+        }
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attr = attributes.item(i);
 
@@ -1231,10 +1281,13 @@ public class vCloudMethod {
                 contentType = getMediaTypeForActionInstantiateVApp();
                 endpoint = vdc.actions.get(contentType);
             }
+            else {
+                throw new CloudException("Unknown content type for post");
+            }
             if( endpoint == null) {
                 throw new CloudException("No endpoint for " + action);
             }
-            return post(action, endpoint, payload);
+            return post(action, endpoint, contentType, payload);
         }
         finally {
             if( logger.isTraceEnabled() ) {
@@ -1260,7 +1313,7 @@ public class vCloudMethod {
                 post.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
                 post.addHeader("x-vcloud-authorization", org.token);
                 if( contentType != null ) {
-                    post.addHeader("ContentType", contentType);
+                    post.addHeader("Content-Type", contentType);
                 }
 
                 if( wire.isDebugEnabled() ) {
@@ -1357,8 +1410,15 @@ public class vCloudMethod {
                         throw new CloudException(e);
                     }
 
-                    vCloudException.Data data = vCloudException.parseException(code, xml);
+                    vCloudException.Data data = null;
 
+                    if( xml != null && !xml.equals("") ) {
+                        NodeList errors = parseXML(xml).getElementsByTagName("Error");
+
+                        if( errors.getLength() > 0 ) {
+                            data = vCloudException.parseException(code, errors.item(0));
+                        }
+                    }
                     if( data == null ) {
                         throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
                     }

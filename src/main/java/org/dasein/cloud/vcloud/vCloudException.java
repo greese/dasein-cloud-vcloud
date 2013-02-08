@@ -20,6 +20,8 @@ package org.dasein.cloud.vcloud;
 
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
@@ -39,18 +41,53 @@ public class vCloudException extends CloudException {
         public CloudErrorType type;
     }
 
-    static public Data parseException(@Nonnegative int code, @Nonnull String xml) {
+    static public Data parseException(@Nonnegative int code, @Nonnull Node errorNode) {
         Data data = new Data();
 
         data.code = code;
+
+
+        NodeList attributes = errorNode.getChildNodes();
+        String message = "Unknown";
+        String major = "";
+        String minor = "";
+
+        Node n = errorNode.getAttributes().getNamedItem("minorErrorCode");
+
+        if( n != null ) {
+            minor = n.getNodeValue().trim();
+        }
+        n = errorNode.getAttributes().getNamedItem("majorErrorCode");
+
+        if( n != null ) {
+            major = n.getNodeValue().trim();
+        }
+        n = errorNode.getAttributes().getNamedItem("message");
+
+        if( n != null ) {
+            message = n.getNodeValue().trim();
+        }
+        for( int i=0; i<attributes.getLength(); i++ ) {
+            Node attr = attributes.item(i);
+
+            if( attr.getNodeName().equalsIgnoreCase("message") && attr.hasChildNodes() ) {
+                message = attr.getFirstChild().getNodeValue().trim();
+            }
+            else if( attr.getNodeName().equalsIgnoreCase("majorErrorCode") && attr.hasChildNodes() ) {
+                major = attr.getFirstChild().getNodeValue().trim();
+            }
+            else if( attr.getNodeName().equalsIgnoreCase("minorErrorCode") && attr.hasChildNodes() ) {
+                minor = attr.getFirstChild().getNodeValue().trim();
+            }
+        }
+        data.title = major + ":" + minor;
+        data.description = message;
         if( code == HttpServletResponse.SC_FORBIDDEN || code == HttpServletResponse.SC_UNAUTHORIZED ) {
             data.type = CloudErrorType.AUTHENTICATION;
         }
         else {
             data.type = CloudErrorType.GENERAL;
         }
-        data.title = "Error";   // TODO: fix me
-        data.description = xml;
         return data;
     }
 

@@ -120,7 +120,7 @@ public class TemplateSupport extends AbstractImageSupport {
                 }
                 if( p == published ) {
                     Catalog catalog = new Catalog();
-                    catalog.catalogId = href;
+                    catalog.catalogId = ((vCloud)getProvider()).toID(href);
                     catalog.published = p;
                     catalog.owner = owner;
                     return catalog;

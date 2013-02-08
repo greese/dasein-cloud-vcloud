@@ -32,6 +32,7 @@ import org.dasein.cloud.compute.VirtualMachineProduct;
 import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.RawAddress;
+import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
 import org.dasein.cloud.vcloud.vCloud;
@@ -183,7 +184,7 @@ public class vAppSupport extends AbstractVMSupport {
 
     @Override
     public @Nonnull Requirement identifyVlanRequirement() throws CloudException, InternalException {
-        return Requirement.NONE; // TODO: fix
+        return Requirement.REQUIRED;
     }
 
     @Override
@@ -198,7 +199,6 @@ public class vAppSupport extends AbstractVMSupport {
 
     @Override
     public @Nonnull VirtualMachine launch(@Nonnull VMLaunchOptions withLaunchOptions) throws CloudException, InternalException {
-        StringBuilder xml = new StringBuilder();
         String vdcId = withLaunchOptions.getDataCenterId();
 
         if( vdcId == null ) {
@@ -214,25 +214,48 @@ public class vAppSupport extends AbstractVMSupport {
         }
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
-        xml.append("<InstantiateVAppTemplateParams name=\"").append(vCloud.escapeXml(withLaunchOptions.getFriendlyName())).append("\" xmlns=\"http://www.vmware.com/vcloud/v1\"");
-        xml.append(" xmlns:ovf=\"http://schemas.dmtf.org/ovf/envelope/1\">\n");
+        StringBuilder xml = new StringBuilder();
+        xml.append("<InstantiateVAppTemplateParams name=\"").append(vCloud.escapeXml(withLaunchOptions.getFriendlyName())).append("\" xmlns=\"http://www.vmware.com/vcloud/v1.5\"");
+        xml.append(" deploy=\"false\" xmlns:ovf=\"http://schemas.dmtf.org/ovf/envelope/1\">");
         xml.append("<Description>").append(vCloud.escapeXml(withLaunchOptions.getDescription())).append("</Description>");
+        String vlanId = withLaunchOptions.getVlanId();
+
+        if( vlanId != null ) {
+            VLAN vlan = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().getVlan(vlanId);
+
+            if( vlan != null ) {
+                xml.append("<InstantiationParams>");
+                xml.append("<NetworkConfigSection>");
+                xml.append("<ovf:Info>Configuration parameters for networking</ovf:Info>");
+                xml.append("<NetworkConfig networkName=\"bridged\">");
+                xml.append("<Configuration>");
+                xml.append("<ParentNetwork href=\"").append(method.toURL("network", vlanId)).append("\"/>");
+                //xml.append("<FenceMode>").append(vlan.getTags().get("fenceMode")).append("</FenceMode>");
+                xml.append("<FenceMode>bridged</FenceMode>");
+                xml.append("</Configuration>");
+                xml.append("</NetworkConfig>");
+                xml.append("</NetworkConfigSection>");
+                xml.append("</InstantiationParams>");
+            }
+        }
         xml.append("<Source href=\"").append(method.toURL("vAppTemplate", withLaunchOptions.getMachineImageId())).append("\"/>");
+        xml.append("<AllEULAsAccepted>true</AllEULAsAccepted>");
         xml.append("</InstantiateVAppTemplateParams>");
-        //<InstantiationParams>
-        //<NetworkConfigSection>
-        //<ovf:Info>Configuration parameters for vAppNetwork</ovf:Info>
-        //<NetworkConfig networkName="vAppNetwork">
-        //<Configuration>
-        //<ParentNetwork href="http://vcloud.example.com/api/v1.0/network/54"/> <FenceMode>bridged</FenceMode>
-        //</Configuration>
-        //</NetworkConfig>
-        //</NetworkConfigSection>
-        //</InstantiationParams>
+
+        if( logger.isDebugEnabled() ) {
+            try {
+                method.parseXML(xml.toString());
+                logger.debug("XML passes");
+            }
+            catch( Throwable t ) {
+                logger.error("XML parse failure: " + t.getMessage());
+            }
+        }
         // TODO: finish this stuff
 
-        NodeList vapps = method.parseXML(method.post(vCloudMethod.INSTANTIATE_VAPP, vdcId, xml.toString())).getElementsByTagName("VApp");
+        String response = method.post(vCloudMethod.INSTANTIATE_VAPP, vdcId, xml.toString());
 
+        NodeList vapps = method.parseXML(response).getElementsByTagName("VApp");
 
         if( vapps.getLength() < 1 ) {
             throw new CloudException("The instatiation operation succeeded, but no vApp was present");
@@ -240,8 +263,20 @@ public class vAppSupport extends AbstractVMSupport {
         Node vapp = vapps.item(0);
         Node href = vapp.getAttributes().getNamedItem("href");
 
+        method.waitFor(response);
+
         if( href != null ) {
             String vappId = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+            response = method.get("vApp", vappId);
+
+            if( response == null || response.equals("") ) {
+                throw new CloudException("vApp " + vappId + " went away");
+            }
+            vapps = method.parseXML(response).getElementsByTagName("VApp");
+            if( vapps.getLength() < 1 ) {
+                throw new CloudException("No VApp in vApp request for " + vappId);
+            }
+            vapp = vapps.item(0);
             NodeList tasks = vapp.getChildNodes();
 
             for( int i=0; i<tasks.getLength(); i++ ) {
@@ -271,6 +306,7 @@ public class vAppSupport extends AbstractVMSupport {
             for( int i=0; i<attributes.getLength(); i++ ) {
                 Node attribute = attributes.item(i);
 
+                // TODO: check for task errors
                 if( attribute.getNodeName().equals("Children") && attribute.hasChildNodes() ) {
                     NodeList children = attribute.getChildNodes();
 
@@ -495,7 +531,7 @@ public class vAppSupport extends AbstractVMSupport {
                     Node vmNode = children.item(j);
 
                     if( vmNode.getNodeName().equalsIgnoreCase("Vm") && vmNode.hasAttributes() ) {
-                        VirtualMachine vm = toVirtualMachine(vdcId, vmNode);
+                        VirtualMachine vm = toVirtualMachine(vdcId, id, vmNode);
 
                         if( vm != null ) {
                             vms.add(vm);
@@ -625,12 +661,29 @@ public class vAppSupport extends AbstractVMSupport {
 
     @Override
     public void terminate(@Nonnull String vmId) throws InternalException, CloudException {
+        VirtualMachine vm = getVirtualMachine(vmId);
+
+        if( vm == null ) {
+            throw new CloudException("No such virtual machine: " + vmId);
+        }
+        String vappId = (String)vm.getTag("parentVAppId");
+
+        ArrayList<VirtualMachine> vms = new ArrayList<VirtualMachine>();
+
+        loadVmsFor(vm.getProviderDataCenterId(), vappId, vms);
+
         stop(vmId, true, true);
         undeploy(vmId);
-
+        if( vms.size() == 1 ) {
+            stop(vappId, true, true);
+            undeploy(vappId);
+        }
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
         method.delete("vApp", vmId);
+        if( vms.size() == 1 ) {
+            method.delete("vApp", vappId);
+        }
     }
 
     @Override
@@ -715,9 +768,11 @@ public class vAppSupport extends AbstractVMSupport {
         }
     }
 
-    private @Nullable VirtualMachine toVirtualMachine(@Nonnull String vdcId, @Nonnull Node vmNode) throws CloudException, InternalException {
+    private @Nullable VirtualMachine toVirtualMachine(@Nonnull String vdcId, @Nonnull String parentVAppId, @Nonnull Node vmNode) throws CloudException, InternalException {
         Node n = vmNode.getAttributes().getNamedItem("href");
         VirtualMachine vm = new VirtualMachine();
+
+        vm.setTag("parentVAppId", parentVAppId);
 
         vm.setArchitecture(Architecture.I64);
         vm.setClonable(true);
