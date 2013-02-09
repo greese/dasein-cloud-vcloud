@@ -22,6 +22,7 @@ import org.apache.log4j.Logger;
 import org.dasein.cloud.AbstractCloud;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.vcloud.compute.vCloudComputeServices;
 import org.dasein.cloud.vcloud.network.vCloudNetworkServices;
 
@@ -284,21 +285,27 @@ public class vCloud extends AbstractCloud {
 
     @Override
     public String testContext() {
-        ProviderContext ctx = getContext();
-
-        if( ctx == null ) {
-            logger.warn("No context exists for testing");
-            return null;
-        }
+        APITrace.begin(this, "testContext");
         try {
-            vCloudMethod method = new vCloudMethod(this);
+            ProviderContext ctx = getContext();
 
-            method.authenticate(true);
-            return ctx.getAccountNumber();
+            if( ctx == null ) {
+                logger.warn("No context exists for testing");
+                return null;
+            }
+            try {
+                vCloudMethod method = new vCloudMethod(this);
+
+                method.authenticate(true);
+                return ctx.getAccountNumber();
+            }
+            catch( Throwable t ) {
+                logger.warn("Unable to connect to AWS for " + ctx.getAccountNumber() + ": " + t.getMessage());
+                return null;
+            }
         }
-        catch( Throwable t ) {
-            logger.warn("Unable to connect to AWS for " + ctx.getAccountNumber() + ": " + t.getMessage());
-            return null;
+        finally {
+            APITrace.end();
         }
     }
 

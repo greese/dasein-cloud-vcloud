@@ -74,7 +74,14 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     protected MachineImage capture(@Nonnull ImageCreateOptions options, @Nullable AsynchronousTask<MachineImage> task) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image capture is not currently implemented");
+        APITrace.begin(getProvider(), "captureImageFromVM");
+        try {
+            // TODO: implement custom images
+            throw new OperationNotSupportedException("Image capture is not currently implemented");
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     private @Nullable Catalog getCatalog(boolean published, @Nonnull String href) throws CloudException, InternalException {
@@ -134,17 +141,23 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     public MachineImage getImage(@Nonnull String providerImageId) throws CloudException, InternalException {
-        for( MachineImage image : listImages((ImageFilterOptions)null) ) {
-            if( image.getProviderMachineImageId().equals(providerImageId) ) {
-                return image;
+        APITrace.begin(getProvider(), "getImage");
+        try {
+            for( MachineImage image : listImages((ImageFilterOptions)null) ) {
+                if( image.getProviderMachineImageId().equals(providerImageId) ) {
+                    return image;
+                }
             }
-        }
-        for( MachineImage image : searchPublicImages(null, null, null) ) {
-            if( image.getProviderMachineImageId().equals(providerImageId) ) {
-                return image;
+            for( MachineImage image : searchPublicImages(null, null, null) ) {
+                if( image.getProviderMachineImageId().equals(providerImageId) ) {
+                    return image;
+                }
             }
+            return null;
         }
-        return null;
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -154,19 +167,31 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     public boolean isImageSharedWithPublic(@Nonnull String machineImageId) throws CloudException, InternalException {
-        MachineImage img = getImage(machineImageId);
+        APITrace.begin(getProvider(), "isImageSharedWithPublic");
+        try {
+            MachineImage img = getImage(machineImageId);
 
-        if( img == null ) {
-            return false;
+            if( img == null ) {
+                return false;
+            }
+            Boolean p = (Boolean)img.getTag("public");
+
+            return (p != null && p);
         }
-        Boolean p = (Boolean)img.getTag("public");
-
-        return (p != null && p);
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        return (getProvider().testContext() != null);
+        APITrace.begin(getProvider(), "isSubscribedImage");
+        try {
+            return (getProvider().testContext() != null);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     private Iterable<Catalog> listPublicCatalogs() throws CloudException, InternalException {
@@ -548,7 +573,13 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
-        //To change body of implemented methods use File | Settings | File Templates.
+        APITrace.begin(getProvider(), "removeImage");
+        try {
+            // TODO: implement custom catalogs
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override

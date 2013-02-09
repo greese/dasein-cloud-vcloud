@@ -4,7 +4,7 @@
         "cloud":"default",
         "products":[
             {
-                "architectures":["I64"],
+                "architectures":["I32", "I64"],
                 "id":"t1.micro",
                 "name":"Micro Instance (t1.micro)",
                 "description":"Micro Instance (t1.micro)",
@@ -13,7 +13,7 @@
                 "ramSizeInMb":512
             },
             {
-                "architectures":["I64"],
+                "architectures":["I32", "I64"],
                 "id":"m1.small",
                 "name":"Small Instance (m1.small)",
                 "description":"Small Instance (m1.small)",
@@ -22,7 +22,7 @@
                 "ramSizeInMb":1024
             },
             {
-                "architectures":["I64"],
+                "architectures":["I32", "I64"],
                 "id":"m1.medium",
                 "name":"Medium Instance (m1.medium)",
                 "description":"Medium Instance (m1.medium)",

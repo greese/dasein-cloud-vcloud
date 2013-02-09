@@ -8,6 +8,7 @@ import org.dasein.cloud.network.AbstractVLANSupport;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.network.VLANState;
+import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
 import org.w3c.dom.Document;
@@ -47,9 +48,15 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public int getMaxVlanCount() throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        APITrace.begin(getProvider(), "getMaxVlanCount");
+        try {
+            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
-        return method.getNetworkQuota();
+            return method.getNetworkQuota();
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -69,21 +76,33 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public VLAN getVlan(@Nonnull String vlanId) throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        APITrace.begin(getProvider(), "getVlan");
+        try {
+            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
-        for( DataCenter dc : method.listDataCenters() ) {
-            VLAN vlan = toVlan(dc.getProviderDataCenterId(), vlanId);
+            for( DataCenter dc : method.listDataCenters() ) {
+                VLAN vlan = toVlan(dc.getProviderDataCenterId(), vlanId);
 
-            if( vlan != null ) {
-                return vlan;
+                if( vlan != null ) {
+                    return vlan;
+                }
             }
+            return null;
         }
-        return null;
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        return (getProvider().testContext() != null);
+        APITrace.begin(getProvider(), "isSubscribedVLAN");
+        try {
+            return (getProvider().testContext() != null);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -98,40 +117,49 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listVlanStatus() throws CloudException, InternalException {
-        // TODO: do this more intelligently
-        return super.listVlanStatus();
+        APITrace.begin(getProvider(), "listVlanStatus");
+        try {
+            // TODO: do this more intelligently
+            return super.listVlanStatus();
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public @Nonnull Iterable<VLAN> listVlans() throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-        ArrayList<VLAN> vlans = new ArrayList<VLAN>();
+        APITrace.begin(getProvider(), "listVlans");
+        try {
+            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            ArrayList<VLAN> vlans = new ArrayList<VLAN>();
 
-        for( DataCenter dc : method.listDataCenters() ) {
-            String xml = method.get("vdc", dc.getProviderDataCenterId());
+            for( DataCenter dc : method.listDataCenters() ) {
+                String xml = method.get("vdc", dc.getProviderDataCenterId());
 
-            if( xml != null && !xml.equals("") ) {
-                NodeList vdcs = method.parseXML(xml).getElementsByTagName("Vdc");
+                if( xml != null && !xml.equals("") ) {
+                    NodeList vdcs = method.parseXML(xml).getElementsByTagName("Vdc");
 
-                if( vdcs.getLength() > 0 ) {
-                    NodeList attributes = vdcs.item(0).getChildNodes();
+                    if( vdcs.getLength() > 0 ) {
+                        NodeList attributes = vdcs.item(0).getChildNodes();
 
-                    for( int i=0; i<attributes.getLength(); i++ ) {
-                        Node attribute = attributes.item(i);
+                        for( int i=0; i<attributes.getLength(); i++ ) {
+                            Node attribute = attributes.item(i);
 
-                        if( attribute.getNodeName().equalsIgnoreCase("AvailableNetworks") && attribute.hasChildNodes() ) {
-                            NodeList resources = attribute.getChildNodes();
+                            if( attribute.getNodeName().equalsIgnoreCase("AvailableNetworks") && attribute.hasChildNodes() ) {
+                                NodeList resources = attribute.getChildNodes();
 
-                            for( int j=0; j<resources.getLength(); j++ ) {
-                                Node resource = resources.item(j);
+                                for( int j=0; j<resources.getLength(); j++ ) {
+                                    Node resource = resources.item(j);
 
-                                if( resource.getNodeName().equalsIgnoreCase("Network") && resource.hasAttributes() ) {
-                                    Node href = resource.getAttributes().getNamedItem("href");
+                                    if( resource.getNodeName().equalsIgnoreCase("Network") && resource.hasAttributes() ) {
+                                        Node href = resource.getAttributes().getNamedItem("href");
 
-                                    VLAN vlan = toVlan(dc.getProviderDataCenterId(), ((vCloud) getProvider()).toID(href.getNodeValue().trim()));
+                                        VLAN vlan = toVlan(dc.getProviderDataCenterId(), ((vCloud) getProvider()).toID(href.getNodeValue().trim()));
 
-                                    if( vlan != null ) {
-                                        vlans.add(vlan);
+                                        if( vlan != null ) {
+                                            vlans.add(vlan);
+                                        }
                                     }
                                 }
                             }
@@ -139,8 +167,11 @@ public class HybridVLANSupport extends AbstractVLANSupport {
                     }
                 }
             }
+            return vlans;
         }
-        return vlans;
+        finally {
+            APITrace.end();
+        }
     }
 
     private @Nullable VLAN toVlan(@Nonnull String vdcId, @Nonnull String id) throws InternalException, CloudException {
@@ -354,7 +385,13 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public void removeVlan(String vlanId) throws CloudException, InternalException {
-        // TODO: implement me
-        super.removeVlan(vlanId);
+        APITrace.begin(getProvider(), "removeVlan");
+        try {
+            // TODO: implement me
+            super.removeVlan(vlanId);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 }

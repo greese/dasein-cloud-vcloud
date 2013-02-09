@@ -915,6 +915,10 @@ public class vCloudMethod {
         return "application/vnd.vmware.vcloud.guestCustomizationSection+xml";
     }
 
+    public @Nonnull String getMediaTypeForMetadata() {
+        return "application/vnd.vmware.vcloud.metadata+xml";
+    }
+
     public @Nonnull String getMediaTypeForNetworkConnectionSection() {
         return "application/vnd.vmware.vcloud.networkConnectionSection+xml";
     }
@@ -933,6 +937,10 @@ public class vCloudMethod {
 
     public @Nonnull String getMediaTypeForVDC() {
         return "application/vnd.vmware.vcloud.vdc+xml";
+    }
+
+    public @Nonnull String getMediaTypeForVirtualHardwareSection() {
+        return "application/vnd.vmware.vcloud.virtualHardwareSection+xml";
     }
 
     public int getNetworkQuota() throws CloudException, InternalException {
