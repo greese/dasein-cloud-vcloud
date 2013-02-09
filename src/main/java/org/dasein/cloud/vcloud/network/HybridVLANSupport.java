@@ -206,7 +206,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
                 String ipStart = null;
                 String ipEnd = null;
                 String domain = null;
-                boolean enabled = false;
+                Boolean enabled = null;
 
                 for( int j=0; j<scopesList.getLength(); j++ ) {
                     Node scopesNode = scopesList.item(j);
@@ -214,76 +214,87 @@ public class HybridVLANSupport extends AbstractVLANSupport {
                     if( scopesNode.getNodeName().equalsIgnoreCase("FenceMode") && scopesNode.hasChildNodes() ) {
                         fenceMode = scopesNode.getFirstChild().getNodeValue().trim();
                     }
-                    else if( scopesNode.getNodeName().equalsIgnoreCase("IpScopes") && scopesNode.hasChildNodes() ) {
-                        NodeList scopes = scopesNode.getChildNodes();
+                    else if( (scopesNode.getNodeName().equalsIgnoreCase("IpScope") || scopesNode.getNodeName().equalsIgnoreCase("IpScopes")) && scopesNode.hasChildNodes() ) {
+                        Node scope = null;
 
-                        for( int k=0; k<scopes.getLength(); k++ ) {
-                            Node scope = scopes.item(k);
+                        if( scopesNode.getNodeName().equalsIgnoreCase("IpScope") ) {
+                            scope = scopesNode;
+                        }
+                        else {
+                            NodeList scopes = scopesNode.getChildNodes();
 
-                            if( scope.getNodeName().equalsIgnoreCase("IpScope") && scope.hasChildNodes() ) {
-                                NodeList saList = scope.getChildNodes();
+                            for( int k=0; k<scopes.getLength(); k++ ) {
+                                Node node = scopes.item(k);
 
-                                for( int l=0; l<saList.getLength(); l++ ) {
-                                    Node sa = saList.item(l);
+                                if( node.getNodeName().equalsIgnoreCase("IpScope") ) {
+                                    scope = node;
+                                    break;
+                                }
+                            }
+                        }
+                        if( scope != null ) {
+                            NodeList saList = scope.getChildNodes();
 
-                                    if( sa.getNodeName().equalsIgnoreCase("Gateway") && sa.hasChildNodes() ) {
-                                        gateway = sa.getFirstChild().getNodeValue().trim();
+                            for( int l=0; l<saList.getLength(); l++ ) {
+                                Node sa = saList.item(l);
+
+                                if( sa.getNodeName().equalsIgnoreCase("Gateway") && sa.hasChildNodes() ) {
+                                    gateway = sa.getFirstChild().getNodeValue().trim();
+                                }
+                                else if( sa.getNodeName().equalsIgnoreCase("Netmask") && sa.hasChildNodes() ) {
+                                    netmask = sa.getFirstChild().getNodeValue().trim();
+                                }
+                                else if( sa.getNodeName().equalsIgnoreCase("DnsSuffix") && sa.hasChildNodes() ) {
+                                    domain = sa.getFirstChild().getNodeValue().trim();
+                                }
+                                else if( sa.getNodeName().startsWith("Dns") && sa.hasChildNodes() ) {
+                                    String ns = sa.getFirstChild().getNodeValue().trim();
+
+                                    if( sa.getNodeName().equals("Dns") ) {
+                                        dns[0] = ns;
                                     }
-                                    else if( sa.getNodeName().equalsIgnoreCase("Netmask") && sa.hasChildNodes() ) {
-                                        netmask = sa.getFirstChild().getNodeValue().trim();
-                                    }
-                                    else if( sa.getNodeName().equalsIgnoreCase("DnsSuffix") && sa.hasChildNodes() ) {
-                                        domain = sa.getFirstChild().getNodeValue().trim();
-                                    }
-                                    else if( sa.getNodeName().startsWith("Dns") && sa.hasChildNodes() ) {
-                                        String ns = sa.getFirstChild().getNodeValue().trim();
+                                    else {
+                                        try {
+                                            int idx = Integer.parseInt(sa.getNodeName().substring(3));
 
-                                        if( sa.getNodeName().equals("Dns") ) {
-                                            dns[0] = ns;
+                                            dns[idx] = ns;
                                         }
-                                        else {
-                                            try {
-                                                int idx = Integer.parseInt(sa.getNodeName().substring(3));
-
-                                                dns[idx] = ns;
-                                            }
-                                            catch( NumberFormatException e ) {
-                                                for(int z=0; i<dns.length; z++ ) {
-                                                    if( dns[z] == null ) {
-                                                        dns[z] = ns;
-                                                        break;
-                                                    }
+                                        catch( NumberFormatException e ) {
+                                            for(int z=0; i<dns.length; z++ ) {
+                                                if( dns[z] == null ) {
+                                                    dns[z] = ns;
+                                                    break;
                                                 }
                                             }
                                         }
                                     }
-                                    else if( sa.getNodeName().equalsIgnoreCase("IsEnabled") && sa.hasChildNodes() ) {
-                                        enabled = sa.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
-                                    }
-                                    else if( sa.getNodeName().equalsIgnoreCase("IpRanges") && sa.hasChildNodes() ) {
-                                        NodeList rangesList = sa.getChildNodes();
+                                }
+                                else if( sa.getNodeName().equalsIgnoreCase("IsEnabled") && sa.hasChildNodes() ) {
+                                    enabled = sa.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
+                                }
+                                else if( sa.getNodeName().equalsIgnoreCase("IpRanges") && sa.hasChildNodes() ) {
+                                    NodeList rangesList = sa.getChildNodes();
 
-                                        for( int m=0; m<rangesList.getLength(); m++ ) {
-                                            Node ranges = rangesList.item(m);
+                                    for( int m=0; m<rangesList.getLength(); m++ ) {
+                                        Node ranges = rangesList.item(m);
 
-                                            if( ranges.getNodeName().equalsIgnoreCase("IpRanges") && ranges.hasChildNodes() ) {
-                                                NodeList rangeList = ranges.getChildNodes();
+                                        if( ranges.getNodeName().equalsIgnoreCase("IpRanges") && ranges.hasChildNodes() ) {
+                                            NodeList rangeList = ranges.getChildNodes();
 
-                                                for( int o=0; o<rangeList.getLength(); o++ ) {
-                                                    Node range = rangeList.item(o);
+                                            for( int o=0; o<rangeList.getLength(); o++ ) {
+                                                Node range = rangeList.item(o);
 
-                                                    if( range.getNodeName().equalsIgnoreCase("IpRange") && range.hasChildNodes() ) {
-                                                        NodeList addresses = range.getChildNodes();
+                                                if( range.getNodeName().equalsIgnoreCase("IpRange") && range.hasChildNodes() ) {
+                                                    NodeList addresses = range.getChildNodes();
 
-                                                        for( int p=0; p<addresses.getLength(); p++ ) {
-                                                            Node address = addresses.item(p);
+                                                    for( int p=0; p<addresses.getLength(); p++ ) {
+                                                        Node address = addresses.item(p);
 
-                                                            if( address.getNodeName().equalsIgnoreCase("StartAddress") && address.hasChildNodes() ) {
-                                                                ipStart = address.getFirstChild().getNodeValue().trim();
-                                                            }
-                                                            else if( address.getNodeName().equalsIgnoreCase("EndAddress") && address.hasChildNodes() ) {
-                                                                ipEnd = address.getFirstChild().getNodeValue().trim();
-                                                            }
+                                                        if( address.getNodeName().equalsIgnoreCase("StartAddress") && address.hasChildNodes() ) {
+                                                            ipStart = address.getFirstChild().getNodeValue().trim();
+                                                        }
+                                                        else if( address.getNodeName().equalsIgnoreCase("EndAddress") && address.hasChildNodes() ) {
+                                                            ipEnd = address.getFirstChild().getNodeValue().trim();
                                                         }
                                                     }
                                                 }
@@ -303,7 +314,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
                     }
                 }
                 vlan.setDnsServers(dnsServers.toArray(new String[dnsServers.size()]));
-                vlan.setCurrentState(enabled ? VLANState.AVAILABLE : VLANState.PENDING);
+                vlan.setCurrentState(enabled == null || enabled ? VLANState.AVAILABLE : VLANState.PENDING);
                 if( domain != null ) {
                     vlan.setDomainName(domain);
                 }

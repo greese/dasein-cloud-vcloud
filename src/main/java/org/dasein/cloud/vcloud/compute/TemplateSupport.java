@@ -49,6 +49,7 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Locale;
+import java.util.TreeSet;
 
 /**
  * Implements vApp Template support in accordance with the Dasein Cloud image support model. Dasein Cloud images map
@@ -407,6 +408,7 @@ public class TemplateSupport extends AbstractImageSupport {
             return null;
         }
         Node template = templates.item(0);
+        TreeSet<String> childVms = new TreeSet<String>();
 
         if( image.getName() == null ) {
             Node node = template.getAttributes().getNamedItem("name");
@@ -444,6 +446,11 @@ public class TemplateSupport extends AbstractImageSupport {
                     Node child = children.item(j);
 
                     if( child.getNodeName().equalsIgnoreCase("vm") && child.hasChildNodes() ) {
+                        Node childHref = child.getAttributes().getNamedItem("href");
+
+                        if( childHref != null ) {
+                            childVms.add(((vCloud)getProvider()).toID(childHref.getNodeValue().trim()));
+                        }
                         NodeList vmAttrs = child.getChildNodes();
 
                         for( int k=0; k<vmAttrs.getLength(); k++ ) {
@@ -484,6 +491,23 @@ public class TemplateSupport extends AbstractImageSupport {
                                     }
                                 }
                             }
+                            else if( vmAttr.getNodeName().equalsIgnoreCase("ovf:OperatingSystemSection") && vmAttr.hasChildNodes() ) {
+                                NodeList os = vmAttr.getChildNodes();
+
+                                for( int l=0; l<os.getLength(); l++ ) {
+                                    Node osdesc = os.item(l);
+
+                                    if( osdesc.getNodeName().equalsIgnoreCase("ovf:Description") && osdesc.hasChildNodes() ) {
+                                        String desc = osdesc.getFirstChild().getNodeValue();
+
+                                        image.setPlatform(Platform.guess(desc));
+
+                                        if( desc.contains("32") || (desc.contains("x86") && !desc.contains("64")) ) {
+                                            image.setArchitecture(Architecture.I32);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -510,6 +534,15 @@ public class TemplateSupport extends AbstractImageSupport {
         image.setType(MachineImageType.STORAGE);
         image.setCurrentState(MachineImageState.ACTIVE);
         image.setImageClass(ImageClass.MACHINE);
+        StringBuilder ids = new StringBuilder();
+
+        for( String id : childVms ) {
+            if( ids.length() > 0 ) {
+                ids.append(",");
+            }
+            ids.append(id);
+        }
+        image.setTag("childVirtualMachineIds", ids.toString());
         return image;
     }
 

@@ -25,6 +25,7 @@ import org.dasein.cloud.Requirement;
 import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageClass;
+import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
@@ -45,6 +46,7 @@ import org.dasein.util.uom.time.TimePeriod;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
@@ -58,6 +60,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.TreeSet;
+import java.util.UUID;
 
 /**
  * Implements services for interacting with virtual machines in a vCloud environment. A Dasein Cloud virtual machine
@@ -82,22 +85,26 @@ public class vAppSupport extends AbstractVMSupport {
             NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
 
             for( int i=0; i<nodes.getLength(); i++ ) {
-                Node node = nodes.item(i);
+                NodeList links = nodes.item(i).getChildNodes();
 
-                if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
-                    Node rel = node.getAttributes().getNamedItem("rel");
+                for( int j=0; j<links.getLength(); j++ ) {
+                    Node node = links.item(j);
 
-                    if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("deploy") ) {
-                        Node href = node.getAttributes().getNamedItem("href");
+                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                        Node rel = node.getAttributes().getNamedItem("rel");
 
-                        if( href != null ) {
-                            String endpoint = href.getNodeValue().trim();
-                            String action = method.getAction(endpoint);
-                            StringBuilder payload = new StringBuilder();
+                        if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("deploy") ) {
+                            Node href = node.getAttributes().getNamedItem("href");
 
-                            payload.append("<DeployVAppParams powerOn=\"false\" xmlns=\"http://www.vmware.com/vcloud/v1\"/>");
-                            method.waitFor(method.post(action, endpoint, method.getMediaTypeForActionDeployVApp(), payload.toString()));
-                            break;
+                            if( href != null ) {
+                                String endpoint = href.getNodeValue().trim();
+                                String action = method.getAction(endpoint);
+                                StringBuilder payload = new StringBuilder();
+
+                                payload.append("<DeployVAppParams powerOn=\"false\" xmlns=\"http://www.vmware.com/vcloud/v1.5\"/>");
+                                method.waitFor(method.post(action, endpoint, method.getMediaTypeForActionDeployVApp(), payload.toString()));
+                                break;
+                            }
                         }
                     }
                 }
@@ -213,34 +220,133 @@ public class vAppSupport extends AbstractVMSupport {
             throw new CloudException("Unable to identify a target data center for deploying VM");
         }
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        MachineImage img = ((vCloud)getProvider()).getComputeServices().getImageSupport().getImage(withLaunchOptions.getMachineImageId());
 
+        if( img == null ) {
+            throw new CloudException("No such image: " + withLaunchOptions.getMachineImageId());
+        }
         StringBuilder xml = new StringBuilder();
-        xml.append("<InstantiateVAppTemplateParams name=\"").append(vCloud.escapeXml(withLaunchOptions.getFriendlyName())).append("\" xmlns=\"http://www.vmware.com/vcloud/v1.5\"");
-        xml.append(" deploy=\"false\" xmlns:ovf=\"http://schemas.dmtf.org/ovf/envelope/1\">");
-        xml.append("<Description>").append(vCloud.escapeXml(withLaunchOptions.getDescription())).append("</Description>");
+
+        xml.append("<ComposeVAppParams xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" name=\"").append(withLaunchOptions.getFriendlyName()).append(" Parent vApp\" xmlns=\"http://www.vmware.com/vcloud/v1.5\">");
+
         String vlanId = withLaunchOptions.getVlanId();
+        VLAN vlan = null;
 
         if( vlanId != null ) {
-            VLAN vlan = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().getVlan(vlanId);
-
+            vlan = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().getVlan(vlanId);
             if( vlan != null ) {
                 xml.append("<InstantiationParams>");
-                xml.append("<NetworkConfigSection>");
-                xml.append("<ovf:Info>Configuration parameters for networking</ovf:Info>");
-                xml.append("<NetworkConfig networkName=\"bridged\">");
+                xml.append("<NetworkConfigSection href=\"").append(method.toURL("vAppTemplate", withLaunchOptions.getMachineImageId())).append("/networkConfigSection\" ");
+                xml.append("type=\"application/vnd.vmware.vcloud.networkConfigSection+xml\">");
+                xml.append("<Info xmlns=\"http://schemas.dmtf.org/ovf/envelope/1\">The configuration parameters for logical networks</Info>");
+                xml.append("<NetworkConfig networkName=\"").append(vlan.getName()).append("\">");
                 xml.append("<Configuration>");
-                xml.append("<ParentNetwork href=\"").append(method.toURL("network", vlanId)).append("\"/>");
-                //xml.append("<FenceMode>").append(vlan.getTags().get("fenceMode")).append("</FenceMode>");
+                xml.append("<ParentNetwork href=\"").append(method.toURL("network", vlan.getProviderVlanId())).append("\"/>");
                 xml.append("<FenceMode>bridged</FenceMode>");
+                xml.append("<RetainNetInfoAcrossDeployments>false</RetainNetInfoAcrossDeployments>");
                 xml.append("</Configuration>");
+                xml.append("<IsDeployed>false</IsDeployed>");
                 xml.append("</NetworkConfig>");
                 xml.append("</NetworkConfigSection>");
                 xml.append("</InstantiationParams>");
             }
         }
-        xml.append("<Source href=\"").append(method.toURL("vAppTemplate", withLaunchOptions.getMachineImageId())).append("\"/>");
-        xml.append("<AllEULAsAccepted>true</AllEULAsAccepted>");
-        xml.append("</InstantiateVAppTemplateParams>");
+        String idString = (String)img.getTag("childVirtualMachineIds");
+        String[] ids;
+
+        if( idString.contains(",") ) {
+            ids = idString.split(",");
+        }
+        else {
+            ids = new String[] { idString };
+        }
+        int count = 1;
+
+        for( String id : ids ) {
+            String suffix = ((ids.length > 1) ? ("-" + count) : "");
+
+            count++;
+            xml.append("<SourcedItem>");
+            xml.append("<Source href=\"").append(method.toURL("vAppTemplate", id)).append("\" name=\"").append(vCloud.escapeXml(withLaunchOptions.getFriendlyName() + suffix)).append("\"/>");
+            xml.append("<InstantiationParams>");
+
+            if( vlan != null ) {
+
+                xml.append("<NetworkConnectionSection href=\"").append(method.toURL("vAppTemplate", id)).append("/networkConnectionSection/").append("\" ");
+                xml.append(" type=\"").append(method.getMediaTypeForNetworkConnectionSection()).append("\">");
+                xml.append("<Info xmlns=\"http://schemas.dmtf.org/ovf/envelope/1\">Specifies the available VM network connections</Info>");
+                xml.append("<PrimaryNetworkConnectionIndex>0</PrimaryNetworkConnectionIndex>");
+                xml.append("<NetworkConnection network=\"").append(vCloud.escapeXml(vlan.getName())).append("\">");
+                xml.append("<NetworkConnectionIndex>0</NetworkConnectionIndex>");
+                xml.append("<IsConnected>true</IsConnected>");
+                xml.append("<IpAddressAllocationMode>DHCP</IpAddressAllocationMode>");
+                xml.append("</NetworkConnection>");
+                xml.append("</NetworkConnectionSection>");
+            }
+            /*
+            <ovf:VirtualHardwareSection
+    xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1"
+    xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData"
+    xmlns:vcloud="http://www.vmware.com/vcloud/v1.5"
+    xmlns:vssd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    ovf:transport=""
+    vcloud:href="https://vcloud.example.com/api/vApp/vm-48dd74fb-b732-4b37-998d-63ff7969c228/virtualHardwareSection/"
+    vcloud:type="application/vnd.vmware.vcloud.virtualHardwareSection+xml">
+    <ovf:Info>Virtual hardware requirements</ovf:Info>
+    <ovf:Item
+        vcloud:href="https://vcloud.example.com/api/vApp/vm-48dd74fb-b732-4b37-998d-63ff7969c228/virtualHardwareSection/cpu"
+        vcloud:type="application/vnd.vmware.vcloud.rasdItem+xml">
+        <rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>
+        <rasd:Description>Number of Virtual CPUs</rasd:Description>
+        <rasd:ElementName>1 virtual CPU(s)</rasd:ElementName>
+        <rasd:InstanceID>4</rasd:InstanceID>
+        <rasd:Reservation>0</rasd:Reservation>
+        <rasd:ResourceType>3</rasd:ResourceType>
+        <rasd:VirtualQuantity>1</rasd:VirtualQuantity>
+        <rasd:Weight>0</rasd:Weight>
+        <vcloud:Link
+            href="https://vcloud.example.com/api/vApp/vm-48dd74fb-b732-4b37-998d-63ff7969c228/virtualHardwareSection/cpu"
+            rel="edit"
+            type="application/vnd.vmware.vcloud.rasdItem+xml"/>
+    </ovf:Item>
+    <ovf:Item
+        vcloud:href="https://vcloud.example.com/api/vApp/vm-48dd74fb-b732-4b37-998d-63ff7969c228/virtualHardwareSection/memory"
+        vcloud:type="application/vnd.vmware.vcloud.rasdItem+xml">
+        <rasd:AllocationUnits>byte * 2^20</rasd:AllocationUnits>
+        <rasd:Description>Memory Size</rasd:Description>
+        <rasd:ElementName>32 MB of memory</rasd:ElementName>
+        <rasd:InstanceID>5</rasd:InstanceID>
+        <rasd:Reservation>0</rasd:Reservation>
+        <rasd:ResourceType>4</rasd:ResourceType>
+        <rasd:VirtualQuantity>32</rasd:VirtualQuantity>
+        <rasd:Weight>0</rasd:Weight>
+        <vcloud:Link
+            href="https://vcloud.example.com/api/vApp/vm-48dd74fb-b732-4b37-998d-63ff7969c228/virtualHardwareSection/memory"
+            rel="edit"
+            type="application/vnd.vmware.vcloud.rasdItem+xml"/>
+    </ovf:Item>
+    </ovf:VirtualHardwareSection
+             */
+            xml.append("<GuestCustomizationSection href=\"").append(method.toURL("vAppTemplate", id)).append("/guestCustomizationSection/\" ");
+            xml.append("type=\"").append(method.getMediaTypeForGuestConnectionSection()).append("\">");
+
+            xml.append("<Info xmlns=\"http://schemas.dmtf.org/ovf/envelope/1\">Specifies Guest OS Customization Settings</Info>");
+            xml.append("<Enabled>true</Enabled>");
+            xml.append("<ChangeSid>false</ChangeSid>");
+            xml.append("<VirtualMachineId>").append(UUID.randomUUID().toString()).append("</VirtualMachineId>");
+            xml.append("<JoinDomainEnabled>false</JoinDomainEnabled>");
+            xml.append("<UseOrgSettings>false</UseOrgSettings>");
+            xml.append("<AdminPasswordEnabled>true</AdminPasswordEnabled>");
+            xml.append("<AdminPasswordAuto>true</AdminPasswordAuto>");
+            xml.append("<ResetPasswordRequired>false</ResetPasswordRequired>");
+            xml.append("<ComputerName>").append(vCloud.escapeXml(validateHostName(withLaunchOptions.getHostName() + suffix))).append("</ComputerName>");
+            xml.append("</GuestCustomizationSection>");
+
+            xml.append("</InstantiationParams>");
+            xml.append("</SourcedItem>");
+        }
+        xml.append("</ComposeVAppParams>");
 
         if( logger.isDebugEnabled() ) {
             try {
@@ -253,7 +359,7 @@ public class vAppSupport extends AbstractVMSupport {
         }
         // TODO: finish this stuff
 
-        String response = method.post(vCloudMethod.INSTANTIATE_VAPP, vdcId, xml.toString());
+        String response = method.post(vCloudMethod.COMPOSE_VAPP, vdcId, xml.toString());
 
         NodeList vapps = method.parseXML(response).getElementsByTagName("VApp");
 
@@ -306,7 +412,6 @@ public class vAppSupport extends AbstractVMSupport {
             for( int i=0; i<attributes.getLength(); i++ ) {
                 Node attribute = attributes.item(i);
 
-                // TODO: check for task errors
                 if( attribute.getNodeName().equals("Children") && attribute.hasChildNodes() ) {
                     NodeList children = attribute.getChildNodes();
 
@@ -335,6 +440,7 @@ public class vAppSupport extends AbstractVMSupport {
             if( vm == null ) {
                 throw new CloudException("Unable to identify vm " + vmId + " in " + vappId);
             }
+            vm.setProviderMachineImageId(withLaunchOptions.getMachineImageId());
             return vm;
         }
         throw new CloudException("Unable to identify virtual machine in response");
@@ -462,11 +568,23 @@ public class vAppSupport extends AbstractVMSupport {
 
     @Override
     public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
-        return Collections.singletonList(Architecture.I64);
+        Cache<Architecture> cache = Cache.getInstance(getProvider(), "architectures", Architecture.class, CacheLevel.CLOUD);
+        Iterable<Architecture> list = cache.get(getContext());
+
+        if( list == null) {
+            ArrayList<Architecture> a = new ArrayList<Architecture>();
+
+            a.add(Architecture.I32);
+            a.add(Architecture.I64);
+            list = a;
+            cache.put(getContext(), Collections.unmodifiableList(a));
+        }
+        return list;
     }
 
     @Override
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
+        Iterable<VLAN> vlans = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans();
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         ArrayList<VirtualMachine> vms = new ArrayList<VirtualMachine>();
 
@@ -494,7 +612,7 @@ public class vAppSupport extends AbstractVMSupport {
                                     if( type != null && type.getNodeValue().equalsIgnoreCase(method.getMediaTypeForVApp()) ) {
                                         Node href = resource.getAttributes().getNamedItem("href");
 
-                                        loadVmsFor(dc.getProviderDataCenterId(), ((vCloud)getProvider()).toID(href.getNodeValue().trim()), vms);
+                                        loadVmsFor(dc.getProviderDataCenterId(), ((vCloud)getProvider()).toID(href.getNodeValue().trim()), vms, vlans);
                                     }
                                 }
                             }
@@ -506,7 +624,7 @@ public class vAppSupport extends AbstractVMSupport {
         return vms;
     }
 
-    private void loadVmsFor(@Nonnull String vdcId, @Nonnull String id, @Nonnull ArrayList<VirtualMachine> vms) throws InternalException, CloudException {
+    private void loadVmsFor(@Nonnull String vdcId, @Nonnull String id, @Nonnull ArrayList<VirtualMachine> vms, @Nonnull Iterable<VLAN> vlans) throws InternalException, CloudException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
         String xml = method.get("vApp", id);
@@ -531,7 +649,7 @@ public class vAppSupport extends AbstractVMSupport {
                     Node vmNode = children.item(j);
 
                     if( vmNode.getNodeName().equalsIgnoreCase("Vm") && vmNode.hasAttributes() ) {
-                        VirtualMachine vm = toVirtualMachine(vdcId, id, vmNode);
+                        VirtualMachine vm = toVirtualMachine(vdcId, id, vmNode, vlans);
 
                         if( vm != null ) {
                             vms.add(vm);
@@ -573,6 +691,10 @@ public class vAppSupport extends AbstractVMSupport {
     }
 
     @Override
+    public void resume(@Nonnull String vmId) throws CloudException, InternalException {
+        startVapp(vmId);
+    }
+    @Override
     public void start(@Nonnull String vmId) throws CloudException, InternalException {
         startVapp(vmId);
     }
@@ -582,23 +704,31 @@ public class vAppSupport extends AbstractVMSupport {
         String xml = method.get("vApp", vappId);
 
         if( xml != null ) {
-            NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
+            Document doc = method.parseXML(xml);
+            NodeList nodes = doc.getElementsByTagName("VApp");
 
+            if( nodes.getLength() < 1 ) {
+                nodes = doc.getElementsByTagName("Vm");
+            }
             for( int i=0; i<nodes.getLength(); i++ ) {
-                Node node = nodes.item(i);
+                NodeList links = nodes.item(i).getChildNodes();
 
-                if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
-                    Node rel = node.getAttributes().getNamedItem("rel");
+                for( int j=0; j<links.getLength(); j++ ) {
+                    Node node = links.item(j);
 
-                    if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:powerOn") ) {
-                        Node href = node.getAttributes().getNamedItem("href");
+                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                        Node rel = node.getAttributes().getNamedItem("rel");
 
-                        if( href != null ) {
-                            String endpoint = href.getNodeValue().trim();
-                            String action = method.getAction(endpoint);
+                        if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:powerOn") ) {
+                            Node href = node.getAttributes().getNamedItem("href");
 
-                            method.post(action, endpoint, null, null);
-                            break;
+                            if( href != null ) {
+                                String endpoint = href.getNodeValue().trim();
+                                String action = method.getAction(endpoint);
+
+                                method.post(action, endpoint, null, null);
+                                break;
+                            }
                         }
                     }
                 }
@@ -616,42 +746,102 @@ public class vAppSupport extends AbstractVMSupport {
         String xml = method.get("vApp", vmId);
 
         if( xml != null ) {
-            NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
+            Document doc = method.parseXML(xml);
+            NodeList nodes = doc.getElementsByTagName("VApp");
 
+            if( nodes.getLength() < 1 ) {
+                nodes = doc.getElementsByTagName("Vm");
+            }
             for( int i=0; i<nodes.getLength(); i++ ) {
-                Node node = nodes.item(i);
+                NodeList links = nodes.item(i).getChildNodes();
 
-                if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
-                    Node rel = node.getAttributes().getNamedItem("rel");
+                for( int j=0; j<links.getLength(); j++ ) {
+                    Node node = links.item(j);
 
-                    if( force && rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:powerOff") ) {
-                        Node href = node.getAttributes().getNamedItem("href");
+                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                        Node rel = node.getAttributes().getNamedItem("rel");
 
-                        if( href != null ) {
-                            String endpoint = href.getNodeValue().trim();
-                            String action = method.getAction(endpoint);
+                        if( force && rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:powerOff") ) {
+                            Node href = node.getAttributes().getNamedItem("href");
 
-                            String task = method.post(action, endpoint, null, null);
+                            if( href != null ) {
+                                String endpoint = href.getNodeValue().trim();
+                                String action = method.getAction(endpoint);
 
-                            if( wait ) {
-                                method.waitFor(task);
+                                String task = method.post(action, endpoint, null, null);
+
+                                if( wait ) {
+                                    method.waitFor(task);
+                                }
+                                break;
                             }
-                            break;
+                        }
+                        else if( !force && rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:shutdown") ) {
+                            Node href = node.getAttributes().getNamedItem("href");
+
+                            if( href != null ) {
+                                String endpoint = href.getNodeValue().trim();
+                                String action = method.getAction(endpoint);
+
+                                String task = method.post(action, endpoint, null, null);
+
+                                if( wait ) {
+                                    method.waitFor(task);
+                                }
+                                break;
+                            }
                         }
                     }
-                    else if( !force && rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:shutdown") ) {
-                        Node href = node.getAttributes().getNamedItem("href");
+                }
+            }
+        }
+    }
 
-                        if( href != null ) {
-                            String endpoint = href.getNodeValue().trim();
-                            String action = method.getAction(endpoint);
+    @Override
+    public boolean supportsStartStop(@Nonnull VirtualMachine vm) {
+        return true;
+    }
 
-                            String task = method.post(action, endpoint, null, null);
+    @Override
+    public boolean supportsSuspendResume(@Nonnull VirtualMachine vm) {
+        return true;
+    }
 
-                            if( wait ) {
-                                method.waitFor(task);
+    @Override
+    public void suspend(@Nonnull String vmId) throws CloudException, InternalException {
+        suspendVapp(vmId);
+    }
+
+    private void suspendVapp(@Nonnull String vappId) throws CloudException, InternalException {
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        String xml = method.get("vApp", vappId);
+
+        if( xml != null ) {
+            Document doc = method.parseXML(xml);
+            NodeList nodes = doc.getElementsByTagName("VApp");
+
+            if( nodes.getLength() < 1 ) {
+                nodes = doc.getElementsByTagName("Vm");
+            }
+            for( int i=0; i<nodes.getLength(); i++ ) {
+                NodeList links = nodes.item(i).getChildNodes();
+
+                for( int j=0; j<links.getLength(); j++ ) {
+                    Node node = links.item(j);
+
+                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                        Node rel = node.getAttributes().getNamedItem("rel");
+
+                        if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:suspend") ) {
+                            Node href = node.getAttributes().getNamedItem("href");
+
+                            if( href != null ) {
+                                String endpoint = href.getNodeValue().trim();
+                                String action = method.getAction(endpoint);
+
+                                method.post(action, endpoint, null, null);
+                                break;
                             }
-                            break;
                         }
                     }
                 }
@@ -669,26 +859,33 @@ public class vAppSupport extends AbstractVMSupport {
         String vappId = (String)vm.getTag("parentVAppId");
 
         ArrayList<VirtualMachine> vms = new ArrayList<VirtualMachine>();
+        boolean contains = false;
 
-        loadVmsFor(vm.getProviderDataCenterId(), vappId, vms);
+        loadVmsFor(vm.getProviderDataCenterId(), vappId, vms, ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans());
 
-        stop(vmId, true, true);
-        undeploy(vmId);
-        if( vms.size() == 1 ) {
-            stop(vappId, true, true);
-            undeploy(vappId);
+        for( VirtualMachine v : vms ) {
+            if( v.getProviderVirtualMachineId().equals(vmId) ) {
+                contains = true;
+                break;
+            }
         }
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
-        method.delete("vApp", vmId);
-        if( vms.size() == 1 ) {
+        try { stop(vmId, true, true); }
+        catch( Throwable ignore ) { }
+
+        if( vms.size() == 1 && contains ) {
+            try { stop(vappId, true, true); }
+            catch( Throwable ignore ) { }
+            try { undeploy(vappId); }
+            catch( Throwable ignore ) { }
             method.delete("vApp", vappId);
         }
-    }
-
-    @Override
-    public boolean supportsStartStop(@Nonnull VirtualMachine vm) {
-        return true;
+        else {
+            try { undeploy(vmId); }
+            catch( Throwable ignore ) { }
+            method.delete("vApp", vmId);
+        }
     }
 
     private @Nullable VirtualMachineProduct toProduct(@Nonnull JSONObject json) throws InternalException {
@@ -768,12 +965,12 @@ public class vAppSupport extends AbstractVMSupport {
         }
     }
 
-    private @Nullable VirtualMachine toVirtualMachine(@Nonnull String vdcId, @Nonnull String parentVAppId, @Nonnull Node vmNode) throws CloudException, InternalException {
+    private @Nullable VirtualMachine toVirtualMachine(@Nonnull String vdcId, @Nonnull String parentVAppId, @Nonnull Node vmNode, @Nonnull Iterable<VLAN> vlans) throws CloudException, InternalException {
         Node n = vmNode.getAttributes().getNamedItem("href");
         VirtualMachine vm = new VirtualMachine();
 
         vm.setTag("parentVAppId", parentVAppId);
-
+        vm.setProviderMachineImageId("unknown");
         vm.setArchitecture(Architecture.I64);
         vm.setClonable(true);
         vm.setCreationTimestamp(0L);
@@ -808,6 +1005,22 @@ public class vAppSupport extends AbstractVMSupport {
             if( attribute.getNodeName().equalsIgnoreCase("Description") && attribute.hasChildNodes() ) {
                 vm.setDescription(attribute.getFirstChild().getNodeValue().trim());
             }
+            else if( attribute.getNodeName().equalsIgnoreCase("GuestCustomizationSection") && attribute.hasChildNodes() ) {
+                NodeList elements = attribute.getChildNodes();
+                String adminPassword = null;
+
+                for( int j=0; j<elements.getLength(); j++ ) {
+                    Node element = elements.item(j);
+
+                    if( element.getNodeName().equalsIgnoreCase("AdminPassword") && element.hasChildNodes() ) {
+                        adminPassword = element.getFirstChild().getNodeValue().trim();
+                    }
+                }
+                if( adminPassword != null ) {
+                    vm.setRootUser("root");
+                    vm.setRootPassword(adminPassword);
+                }
+            }
             else if( attribute.getNodeName().equalsIgnoreCase("NetworkConnectionSection") && attribute.hasChildNodes() ) {
                 NodeList elements = attribute.getChildNodes();
                 TreeSet<String> addrs = new TreeSet<String>();
@@ -815,37 +1028,107 @@ public class vAppSupport extends AbstractVMSupport {
                 for( int j=0; j<elements.getLength(); j++ ) {
                     Node element = elements.item(j);
 
-                    if( element.getNodeName().equalsIgnoreCase("NetworkConnection") && element.hasChildNodes() ) {
-                        NodeList parts = element.getChildNodes();
-                        boolean connected = false;
-                        String addr = null;
+                    if( element.getNodeName().equalsIgnoreCase("NetworkConnection") ) {
+                        if( element.hasChildNodes() ) {
+                            NodeList parts = element.getChildNodes();
+                            Boolean connected = null;
+                            String addr = null;
 
-                        for( int k=0; k<parts.getLength(); k++ ) {
-                            Node part = parts.item(k);
+                            for( int k=0; k<parts.getLength(); k++ ) {
+                                Node part = parts.item(k);
 
-                            if( part.getNodeName().equalsIgnoreCase("IpAddress") && part.hasChildNodes() ) {
-                                addr = part.getFirstChild().getNodeValue().trim();
+                                if( part.getNodeName().equalsIgnoreCase("IpAddress") && part.hasChildNodes() ) {
+                                    addr = part.getFirstChild().getNodeValue().trim();
+                                }
+                                if( part.getNodeName().equalsIgnoreCase("IsConnected") && part.hasChildNodes() ) {
+                                    connected = part.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
+                                }
                             }
-                            if( part.getNodeName().equalsIgnoreCase("IsConnected") && part.hasChildNodes() ) {
-                                connected = part.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
+                            if( (connected == null || connected) && addr != null ) {
+                                addrs.add(addr);
                             }
                         }
-                        if( connected && addr != null ) {
-                            addrs.add(addr);
+                        if( element.hasAttributes() ) {
+                            Node net = element.getAttributes().getNamedItem("network");
+
+                            if( net != null ) {
+                                String netNameOrId = net.getNodeValue().trim();
+                                boolean compat = ((vCloud)getProvider()).isCompat();
+
+                                for( VLAN vlan : vlans ) {
+                                    boolean matches = false;
+
+                                    if( !compat && vlan.getProviderVlanId().equals(netNameOrId) ) {
+                                        matches = true;
+                                    }
+                                    else if( compat && vlan.getProviderVlanId().equals("/network/" + netNameOrId) ) {
+                                        matches = true;
+                                    }
+                                    else if( vlan.getName().equals(netNameOrId) ) {
+                                        matches = true;
+                                    }
+                                    if( matches ) {
+                                        vm.setProviderVlanId(vlan.getProviderVlanId());
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                RawAddress[] addresses = new RawAddress[addrs.size()];
-                int idx=0;
+                if( addrs.size() > 0 ) {
+                    if( addrs.size() == 1 ) {
+                        RawAddress a = new RawAddress(addrs.iterator().next());
 
-                for( String addr : addrs ) {
-                    addresses[idx++] = new RawAddress(addr);
+                        if( a.isPublicIpAddress() ) {
+                            vm.setPublicAddresses(a);
+                        }
+                        else {
+                            vm.setPrivateAddresses(a);
+                        }
+                    }
+                    else {
+                        ArrayList<RawAddress> pub = new ArrayList<RawAddress>();
+                        ArrayList<RawAddress> priv = new ArrayList<RawAddress>();
+
+                        for( String addr : addrs ) {
+                            RawAddress r = new RawAddress(addr);
+
+                            if( r.isPublicIpAddress() ) {
+                                pub.add(r);
+                            }
+                            else {
+                                priv.add(r);
+                            }
+                        }
+                        if( priv.size() > 0 ) {
+                            vm.setPrivateAddresses(priv.toArray(new RawAddress[priv.size()]));
+                        }
+                        if( pub.size() > 0 ) {
+                            vm.setPublicAddresses(pub.toArray(new RawAddress[pub.size()]));
+                        }
+                    }
                 }
-                // TODO: public v private
-                vm.setPrivateAddresses(addresses);
+            }
+           else if( attribute.getNodeName().equalsIgnoreCase("ovf:OperatingSystemSection") && attribute.hasChildNodes() ) {
+                NodeList os = attribute.getChildNodes();
+
+                for( int j=0; j<os.getLength(); j++ ) {
+                    Node osdesc = os.item(j);
+
+                    if( osdesc.getNodeName().equalsIgnoreCase("ovf:Description") && osdesc.hasChildNodes() ) {
+                        String desc = osdesc.getFirstChild().getNodeValue();
+
+                        vm.setPlatform(Platform.guess(desc));
+
+                        if( desc.contains("32") || (desc.contains("x86") && !desc.contains("64")) ) {
+                            vm.setArchitecture(Architecture.I32);
+                        }
+                    }
+                }
             }
             else if( attribute.getNodeName().equalsIgnoreCase("ovf:VirtualHardwareSection") && attribute.hasChildNodes() ) {
-                NodeList hardware = attribute.getChildNodes();
+                    NodeList hardware = attribute.getChildNodes();
                 int memory = 0, cpu = 0;
 
                 for( int j=0; j<hardware.getLength(); j++ ) {
@@ -915,6 +1198,19 @@ public class vAppSupport extends AbstractVMSupport {
         if( vm.getDescription() == null ) {
             vm.setDescription(vm.getName());
         }
+        Platform p = vm.getPlatform();
+
+        if( p == null || p.equals(Platform.UNKNOWN) || p.equals(Platform.UNIX) ) {
+            p = Platform.guess(vm.getName() + " " + vm.getDescription());
+            if( Platform.UNIX.equals(vm.getPlatform()) ) {
+                if( p.isUnix() ) {
+                    vm.setPlatform(p);
+                }
+            }
+            else {
+                vm.setPlatform(p);
+            }
+        }
         return vm;
     }
 
@@ -926,26 +1222,52 @@ public class vAppSupport extends AbstractVMSupport {
             NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
 
             for( int i=0; i<nodes.getLength(); i++ ) {
-                Node node = nodes.item(i);
+                NodeList links = nodes.item(i).getChildNodes();
 
-                if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
-                    Node rel = node.getAttributes().getNamedItem("rel");
+                for( int j=0; j<links.getLength(); j++ ) {
+                    Node node = links.item(j);
 
-                    if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("undeploy") ) {
-                        Node href = node.getAttributes().getNamedItem("href");
+                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                        Node rel = node.getAttributes().getNamedItem("rel");
 
-                        if( href != null ) {
-                            String endpoint = href.getNodeValue().trim();
-                            String action = method.getAction(endpoint);
-                            StringBuilder payload = new StringBuilder();
+                        if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("undeploy") ) {
+                            Node href = node.getAttributes().getNamedItem("href");
 
-                            payload.append("<UndeployVAppParams saveState=\"false\" xmlns=\"http://www.vmware.com/vcloud/v1\"/>");
-                            method.waitFor(method.post(action, endpoint, method.getMediaTypeForActionUndeployVApp(), payload.toString()));
-                            break;
+                            if( href != null ) {
+                                String endpoint = href.getNodeValue().trim();
+                                String action = method.getAction(endpoint);
+                                StringBuilder payload = new StringBuilder();
+
+                                payload.append("<UndeployVAppParams xmlns=\"http://www.vmware.com/vcloud/v1.5\"/>");
+                                method.waitFor(method.post(action, endpoint, method.getMediaTypeForActionUndeployVApp(), payload.toString()));
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    private @Nonnull String validateHostName(@Nonnull String src) {
+        if( src.length() > 11 ) {
+            src = src.substring(src.length()-10);
+        }
+        StringBuilder newName = new StringBuilder();
+
+        for( int i=0; i<11; i++ ) {
+            if( i >= src.length() ) {
+                return newName.toString();
+            }
+            char c = src.toLowerCase().charAt(i);
+
+            if( (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ) {
+                if( i == 0 && c < 'a' || c > 'z' ) {
+                    newName.append("x");
+                }
+                newName.append(c);
+            }
+        }
+        return newName.toString();
     }
 }

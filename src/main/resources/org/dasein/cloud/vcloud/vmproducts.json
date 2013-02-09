@@ -8,9 +8,18 @@
                 "id":"t1.micro",
                 "name":"Micro Instance (t1.micro)",
                 "description":"Micro Instance (t1.micro)",
-                "cpuCount":2,
+                "cpuCount":1,
                 "rootVolumeSizeInGb":1,
-                "ramSizeInMb":613
+                "ramSizeInMb":512
+            },
+            {
+                "architectures":["I64"],
+                "id":"m1.small",
+                "name":"Small Instance (m1.small)",
+                "description":"Small Instance (m1.small)",
+                "cpuCount":1,
+                "rootVolumeSizeInGb":1,
+                "ramSizeInMb":1024
             },
             {
                 "architectures":["I64"],
