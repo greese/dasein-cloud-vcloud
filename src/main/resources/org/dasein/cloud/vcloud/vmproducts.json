@@ -28,7 +28,7 @@
                 "description":"Medium Instance (m1.medium)",
                 "cpuCount":2,
                 "rootVolumeSizeInGb":410,
-                "ramSizeInMb":3750
+                "ramSizeInMb": 3584
             },
             {
                 "architectures":["I64"],
@@ -37,7 +37,7 @@
                 "description":"High-CPU Medium Instance (c1.medium)",
                 "cpuCount":5,
                 "rootVolumeSizeInGb":350,
-                "ramSizeInMb":1700
+                "ramSizeInMb":1536
             },
             {
                 "architectures":["I64"],
@@ -46,7 +46,7 @@
                 "description":"Large Instance (m1.large)",
                 "cpuCount":4,
                 "rootVolumeSizeInGb":850,
-                "ramSizeInMb":7500
+                "ramSizeInMb":7168
             },
             {
                 "architectures":["I64"],
@@ -55,7 +55,7 @@
                 "description":"Extra Large Instance (m1.xlarge)",
                 "cpuCount":8,
                 "rootVolumeSizeInGb":1690,
-                "ramSizeInMb":15000
+                "ramSizeInMb":16000
             },
             {
                 "architectures":["I64"],
@@ -64,7 +64,7 @@
                 "description":"High-CPU Extra Large Instance (c1.xlarge)",
                 "cpuCount":20,
                 "rootVolumeSizeInGb":1690,
-                "ramSizeInMb":7000
+                "ramSizeInMb":7168
             },
             {
                 "architectures":["I64"],
@@ -73,7 +73,7 @@
                 "description":"High-Memory Extra Large Instance (m2.xlarge)",
                 "cpuCount":7,
                 "rootVolumeSizeInGb":420,
-                "ramSizeInMb":17100
+                "ramSizeInMb":17024
             },
             {
                 "architectures":["I64"],

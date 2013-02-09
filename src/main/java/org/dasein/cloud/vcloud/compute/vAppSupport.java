@@ -154,11 +154,80 @@ public class vAppSupport extends AbstractVMSupport {
         return "VM";
     }
 
+    private @Nullable String getVDC(@Nonnull String vappId) throws CloudException, InternalException {
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        String xml = method.get("vApp", vappId);
+
+        if( xml == null || xml.equals("") ) {
+            return null;
+        }
+        NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
+
+        if( nodes.getLength() < 1 ) {
+            return null;
+        }
+        Node node = nodes.item(0);
+        NodeList elements = node.getChildNodes();
+
+        for( int i=0; i<elements.getLength(); i++ ) {
+            Node n = elements.item(i);
+
+            if( n.getNodeName().equalsIgnoreCase("Link") && n.hasAttributes() ) {
+                Node rel = n.getAttributes().getNamedItem("rel");
+
+                if( rel != null && rel.getNodeValue().trim().equals("up") ) {
+                    Node type = n.getAttributes().getNamedItem("type");
+
+                    if( type != null && type.getNodeValue().trim().equals(method.getMediaTypeForVDC()) ) {
+                        Node href = n.getAttributes().getNamedItem("href");
+
+                        if( href != null ) {
+                            return ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     @Override
     public VirtualMachine getVirtualMachine(@Nonnull String vmId) throws InternalException, CloudException {
-        for( VirtualMachine vm : listVirtualMachines() ) { // TODO: be more efficient
-            if( vm.getProviderVirtualMachineId().equals(vmId) ) {
-                return vm;
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        String xml = method.get("vApp", vmId);
+
+        if( xml != null && !xml.equals("") ) {
+            NodeList vmNodes = method.parseXML(xml).getElementsByTagName("Vm");
+
+            if( vmNodes.getLength() < 1 ) {
+                return null;
+            }
+            Node vmNode = vmNodes.item(0);
+            NodeList vmElements = vmNode.getChildNodes();
+            String vdc = null, parentVapp = null;
+
+            for( int i=0; i<vmElements.getLength(); i++ ) {
+                Node n = vmElements.item(i);
+
+                if( n.getNodeName().equalsIgnoreCase("Link") && n.hasAttributes() ) {
+                    Node rel = n.getAttributes().getNamedItem("rel");
+
+                    if( rel != null && rel.getNodeValue().trim().equals("up") ) {
+                        Node type = n.getAttributes().getNamedItem("type");
+
+                        if( type != null && type.getNodeValue().trim().equals(method.getMediaTypeForVApp()) ) {
+                            Node href = n.getAttributes().getNamedItem("href");
+
+                            if( href != null ) {
+                                parentVapp = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                                vdc = getVDC(parentVapp);
+                            }
+                        }
+                    }
+                }
+            }
+            if( vdc != null ) {
+                return toVirtualMachine(vdc, parentVapp, vmNode, ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans());
             }
         }
         return null;
@@ -219,6 +288,7 @@ public class vAppSupport extends AbstractVMSupport {
         if( vdcId == null ) {
             throw new CloudException("Unable to identify a target data center for deploying VM");
         }
+        VirtualMachineProduct product = getProduct(withLaunchOptions.getStandardProductId());
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         MachineImage img = ((vCloud)getProvider()).getComputeServices().getImageSupport().getImage(withLaunchOptions.getMachineImageId());
 
@@ -264,15 +334,15 @@ public class vAppSupport extends AbstractVMSupport {
 
         for( String id : ids ) {
             String suffix = ((ids.length > 1) ? ("-" + count) : "");
+            String templateVmUrl = method.toURL("vAppTemplate", id);
 
             count++;
             xml.append("<SourcedItem>");
-            xml.append("<Source href=\"").append(method.toURL("vAppTemplate", id)).append("\" name=\"").append(vCloud.escapeXml(withLaunchOptions.getFriendlyName() + suffix)).append("\"/>");
+            xml.append("<Source href=\"").append(templateVmUrl).append("\" name=\"").append(vCloud.escapeXml(withLaunchOptions.getFriendlyName() + suffix)).append("\"/>");
             xml.append("<InstantiationParams>");
 
             if( vlan != null ) {
-
-                xml.append("<NetworkConnectionSection href=\"").append(method.toURL("vAppTemplate", id)).append("/networkConnectionSection/").append("\" ");
+                xml.append("<NetworkConnectionSection href=\"").append(templateVmUrl).append("/networkConnectionSection/").append("\" ");
                 xml.append(" type=\"").append(method.getMediaTypeForNetworkConnectionSection()).append("\">");
                 xml.append("<Info xmlns=\"http://schemas.dmtf.org/ovf/envelope/1\">Specifies the available VM network connections</Info>");
                 xml.append("<PrimaryNetworkConnectionIndex>0</PrimaryNetworkConnectionIndex>");
@@ -283,51 +353,6 @@ public class vAppSupport extends AbstractVMSupport {
                 xml.append("</NetworkConnection>");
                 xml.append("</NetworkConnectionSection>");
             }
-            /*
-            <ovf:VirtualHardwareSection
-    xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1"
-    xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData"
-    xmlns:vcloud="http://www.vmware.com/vcloud/v1.5"
-    xmlns:vssd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    ovf:transport=""
-    vcloud:href="https://vcloud.example.com/api/vApp/vm-48dd74fb-b732-4b37-998d-63ff7969c228/virtualHardwareSection/"
-    vcloud:type="application/vnd.vmware.vcloud.virtualHardwareSection+xml">
-    <ovf:Info>Virtual hardware requirements</ovf:Info>
-    <ovf:Item
-        vcloud:href="https://vcloud.example.com/api/vApp/vm-48dd74fb-b732-4b37-998d-63ff7969c228/virtualHardwareSection/cpu"
-        vcloud:type="application/vnd.vmware.vcloud.rasdItem+xml">
-        <rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>
-        <rasd:Description>Number of Virtual CPUs</rasd:Description>
-        <rasd:ElementName>1 virtual CPU(s)</rasd:ElementName>
-        <rasd:InstanceID>4</rasd:InstanceID>
-        <rasd:Reservation>0</rasd:Reservation>
-        <rasd:ResourceType>3</rasd:ResourceType>
-        <rasd:VirtualQuantity>1</rasd:VirtualQuantity>
-        <rasd:Weight>0</rasd:Weight>
-        <vcloud:Link
-            href="https://vcloud.example.com/api/vApp/vm-48dd74fb-b732-4b37-998d-63ff7969c228/virtualHardwareSection/cpu"
-            rel="edit"
-            type="application/vnd.vmware.vcloud.rasdItem+xml"/>
-    </ovf:Item>
-    <ovf:Item
-        vcloud:href="https://vcloud.example.com/api/vApp/vm-48dd74fb-b732-4b37-998d-63ff7969c228/virtualHardwareSection/memory"
-        vcloud:type="application/vnd.vmware.vcloud.rasdItem+xml">
-        <rasd:AllocationUnits>byte * 2^20</rasd:AllocationUnits>
-        <rasd:Description>Memory Size</rasd:Description>
-        <rasd:ElementName>32 MB of memory</rasd:ElementName>
-        <rasd:InstanceID>5</rasd:InstanceID>
-        <rasd:Reservation>0</rasd:Reservation>
-        <rasd:ResourceType>4</rasd:ResourceType>
-        <rasd:VirtualQuantity>32</rasd:VirtualQuantity>
-        <rasd:Weight>0</rasd:Weight>
-        <vcloud:Link
-            href="https://vcloud.example.com/api/vApp/vm-48dd74fb-b732-4b37-998d-63ff7969c228/virtualHardwareSection/memory"
-            rel="edit"
-            type="application/vnd.vmware.vcloud.rasdItem+xml"/>
-    </ovf:Item>
-    </ovf:VirtualHardwareSection
-             */
             xml.append("<GuestCustomizationSection href=\"").append(method.toURL("vAppTemplate", id)).append("/guestCustomizationSection/\" ");
             xml.append("type=\"").append(method.getMediaTypeForGuestConnectionSection()).append("\">");
 
@@ -357,8 +382,6 @@ public class vAppSupport extends AbstractVMSupport {
                 logger.error("XML parse failure: " + t.getMessage());
             }
         }
-        // TODO: finish this stuff
-
         String response = method.post(vCloudMethod.COMPOSE_VAPP, vdcId, xml.toString());
 
         NodeList vapps = method.parseXML(response).getElementsByTagName("VApp");
@@ -421,7 +444,44 @@ public class vAppSupport extends AbstractVMSupport {
                         if( vm.getNodeName().equalsIgnoreCase("Vm") && vm.hasAttributes() ) {
                             href = vm.getAttributes().getNamedItem("href");
                             if( href != null ) {
-                                vmId = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                                String vmUrl = href.getNodeValue().trim();
+
+                                vmId = ((vCloud)getProvider()).toID(vmUrl);
+                                if( product != null ) {
+                                    xml = new StringBuilder();
+
+                                    xml.append("<ovf:VirtualHardwareSection xmlns:ovf=\"http://schemas.dmtf.org/ovf/envelope/1\" ");
+                                    xml.append("xmlns:rasd=\"http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData\" ");
+                                    xml.append("xmlns:vcloud=\"http://www.vmware.com/vcloud/v1.5\" ");
+                                    xml.append("xmlns:vssd=\"http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData\" ");
+                                    xml.append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ");
+                                    xml.append("ovf:transport=\"\" ");
+                                    xml.append("vcloud:href=\"").append(vmUrl).append("/virtualHardwareSection/\" ");
+                                    xml.append("vcloud:type=\"application/vnd.vmware.vcloud.virtualHardwareSection+xml\">");
+                                    xml.append("<ovf:Info>Virtual hardware requirements</ovf:Info>");
+                                    xml.append("<ovf:Item vcloud:href=\"").append(vmUrl).append("/virtualHardwareSection/cpu\">");
+                                    xml.append("<rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>");
+                                    xml.append("<rasd:Description>Number of Virtual CPUs</rasd:Description>");
+                                    xml.append("<rasd:ElementName>").append(String.valueOf(product.getCpuCount())).append(" virtual CPU(s)</rasd:ElementName>");
+                                    xml.append("<rasd:InstanceID>1</rasd:InstanceID>");
+                                    xml.append("<rasd:Reservation>0</rasd:Reservation>");
+                                    xml.append("<rasd:ResourceType>3</rasd:ResourceType>");
+                                    xml.append("<rasd:VirtualQuantity>").append(String.valueOf(product.getCpuCount())).append("</rasd:VirtualQuantity>");
+                                    xml.append("<rasd:Weight>0</rasd:Weight>");
+                                    xml.append("</ovf:Item>");
+                                    xml.append("<ovf:Item  vcloud:href=\"").append(vmUrl).append("/virtualHardwareSection/memory\">");
+                                    xml.append("<rasd:AllocationUnits>byte * 2^20</rasd:AllocationUnits>");
+                                    xml.append("<rasd:Description>Memory Size</rasd:Description>");
+                                    xml.append("<rasd:ElementName>").append(product.getRamSize().toString()).append("</rasd:ElementName>");
+                                    xml.append("<rasd:InstanceID>2</rasd:InstanceID>");
+                                    xml.append("<rasd:Reservation>0</rasd:Reservation>");
+                                    xml.append("<rasd:ResourceType>4</rasd:ResourceType>");
+                                    xml.append("<rasd:VirtualQuantity>").append(String.valueOf(product.getRamSize().intValue())).append("</rasd:VirtualQuantity>");
+                                    xml.append("<rasd:Weight>0</rasd:Weight>");
+                                    xml.append("</ovf:Item>");
+                                    xml.append("</ovf:VirtualHardwareSection>");
+                                    method.waitFor(method.put("updateProduct", vmUrl + "/virtualHardwareSection", "application/vnd.vmware.vcloud.virtualHardwareSection+xml", xml.toString()));
+                                }
                                 break;
                             }
                         }
@@ -871,9 +931,15 @@ public class vAppSupport extends AbstractVMSupport {
         }
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
-        try { stop(vmId, true, true); }
-        catch( Throwable ignore ) { }
-
+        try {
+            stop(vmId, true, true);
+        }
+        catch( Throwable t ) {
+            try { Thread.sleep(30000L); }
+            catch( InterruptedException ignore ) { }
+            try { stop(vmId, true, true); }
+            catch( Throwable ignore ) { }
+        }
         if( vms.size() == 1 && contains ) {
             try { stop(vappId, true, true); }
             catch( Throwable ignore ) { }
