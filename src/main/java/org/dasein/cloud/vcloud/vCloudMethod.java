@@ -82,6 +82,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.TreeSet;
 
@@ -1745,6 +1746,33 @@ public class vCloudMethod {
                 logger.trace("EXIT: " + vCloudMethod.class.getName() + ".post()");
             }
         }
+    }
+
+    public void postMetaData(@Nonnull String resource, @Nonnull String id, @Nonnull Map<String,Object> metadata) throws CloudException, InternalException {
+        String apiVersion = getAPIVersion();
+        StringBuilder xml = new StringBuilder();
+
+        xml.append("<Metadata xmlns=\"http://www.vmware.com/vcloud/v1.5\" ");
+        xml.append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+        for( Map.Entry<String,Object> entry : metadata.entrySet() ) {
+            Object value = entry.getValue();
+
+            if( value != null ) {
+                xml.append("<MetadataEntry>");
+                xml.append("<Domain>GENERAL</Domain>");
+                xml.append("<Key>").append(vCloud.escapeXml(entry.getKey())).append("</Key>");
+                if( vCloudMethod.matches(apiVersion, "5.1", null) ) {
+                    xml.append("<TypedValue xsi:type=\"MetadataStringValue\">");
+                }
+                xml.append("<Value>").append(vCloud.escapeXml(value.toString())).append("</Value>");
+                if(vCloudMethod.matches(apiVersion, "5.1", null) ) {
+                    xml.append("</TypedValue>");
+                }
+                xml.append("</MetadataEntry>");
+            }
+        }
+        xml.append("</Metadata>");
+        post("metaData", toURL(resource, id) + "/metadata", getMediaTypeForMetadata(), xml.toString());
     }
 
     public @Nonnull String put(@Nonnull String action, @Nonnull String endpoint, @Nullable String contentType, @Nullable String payload) throws CloudException, InternalException {

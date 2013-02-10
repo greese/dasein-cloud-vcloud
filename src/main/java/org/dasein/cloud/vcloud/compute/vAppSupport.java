@@ -321,7 +321,6 @@ public class vAppSupport extends AbstractVMSupport {
             if( img == null ) {
                 throw new CloudException("No such image: " + withLaunchOptions.getMachineImageId());
             }
-            String apiVersion = method.getAPIVersion();
             StringBuilder xml = new StringBuilder();
 
             xml.append("<ComposeVAppParams xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" name=\"").append(withLaunchOptions.getFriendlyName()).append(" Parent vApp\" xmlns=\"http://www.vmware.com/vcloud/v1.5\">");
@@ -531,28 +530,7 @@ public class vAppSupport extends AbstractVMSupport {
                                         }
                                         metadata.put("dsnImageId", img.getProviderMachineImageId());
                                         metadata.put("dsnCreated", String.valueOf(System.currentTimeMillis()));
-                                        xml = new StringBuilder();
-                                        xml.append("<Metadata xmlns=\"http://www.vmware.com/vcloud/v1.5\" ");
-                                        xml.append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
-                                        for( Map.Entry<String,Object> entry : metadata.entrySet() ) {
-                                            Object value = entry.getValue();
-
-                                            if( value != null ) {
-                                                xml.append("<MetadataEntry>");
-                                                xml.append("<Domain>GENERAL</Domain>");
-                                                xml.append("<Key>").append(vCloud.escapeXml(entry.getKey())).append("</Key>");
-                                                if( vCloudMethod.matches(apiVersion, "5.1", null) ) {
-                                                    xml.append("<TypedValue xsi:type=\"MetadataStringValue\">");
-                                                }
-                                                xml.append("<Value>").append(vCloud.escapeXml(value.toString())).append("</Value>");
-                                                if(vCloudMethod.matches(apiVersion, "5.1", null) ) {
-                                                    xml.append("</TypedValue>");
-                                                }
-                                                xml.append("</MetadataEntry>");
-                                            }
-                                        }
-                                        xml.append("</Metadata>");
-                                        method.post("metaData", vmUrl + "/metadata", method.getMediaTypeForMetadata(), xml.toString());
+                                        method.postMetaData("vApp", vmId, metadata);
                                     }
                                     catch( Throwable ignore ) {
                                         logger.warn("Error updating meta-data on launch: " + ignore.getMessage());

@@ -46,19 +46,11 @@ public class DiskSupport extends AbstractVolumeSupport {
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             StringBuilder xml = new StringBuilder();
-            String[] parts = deviceId.split(":");
-            String busNumber = parts.length > 0 ? parts[0] : deviceId;
-            String unitNumber = parts.length > 1 ? parts[1] : null;
 
             xml.append("<DiskAttachOrDetachParams xmlns=\"http://www.vmware.com/vcloud/v1.5\">");
             xml.append("<Disk type=\"application/vnd.vmware.vcloud.disk+xml\" href=\"").append(method.toURL("disk", volumeId)).append("\" />");
-            //xml.append("<BusNumber>").append(vCloud.escapeXml(busNumber)).append("</BusNumber>");
-            //if( unitNumber != null ) {
-              //  xml.append("<UnitNumber>").append(vCloud.escapeXml(unitNumber)).append("</UnitNumber>");
-            //}
             xml.append("</DiskAttachOrDetachParams>");
             method.waitFor(method.post("attachVolume", method.toURL("vApp", toServer) + "/disk/action/attach", method.getMediaTypeForActionAttachVolume(), xml.toString()));
-            // TODO: update meta data
         }
         finally {
             APITrace.end();
@@ -117,25 +109,7 @@ public class DiskSupport extends AbstractVolumeSupport {
                     }
                     meta.put("dsnCreated", System.currentTimeMillis());
                     meta.put("dsnDeviceId", options.getDeviceId());
-
-                    xml = new StringBuilder();
-                    xml.append("<Metadata xmlns=\"http://www.vmware.com/vcloud/v1.5\" ");
-                    xml.append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
-                    for( Map.Entry<String,Object> entry : meta.entrySet() ) {
-                        Object value = entry.getValue();
-
-                        if( value != null ) {
-                            xml.append("<MetadataEntry>");
-                            xml.append("<Domain>GENERAL</Domain>");
-                            xml.append("<Key>").append(vCloud.escapeXml(entry.getKey())).append("</Key>");
-                            xml.append("<TypedValue xsi:type=\"MetadataStringValue\">");
-                            xml.append("<Value>").append(vCloud.escapeXml(value.toString())).append("</Value>");
-                            xml.append("</TypedValue>");
-                            xml.append("</MetadataEntry>");
-                        }
-                    }
-                    xml.append("</Metadata>");
-                    method.post("volumeMetaData", href.getNodeValue().trim() + "/metadata", method.getMediaTypeForMetadata(), xml.toString());
+                    method.postMetaData("disk", volumeId, meta);
                 }
                 catch( Throwable ignore ) {
                     logger.warn("Error updating meta-data on volume creation: " + ignore.getMessage());
@@ -422,13 +396,13 @@ public class DiskSupport extends AbstractVolumeSupport {
                 if( xml != null && !xml.equals("") ) {
                     method.parseMetaData(volume, xml);
 
-                    String t = (String)volume.getTag("dsnCreated");
+                    String t = volume.getTag("dsnCreated");
 
                     if( t != null ) {
                         try { volume.setCreationTimestamp(Long.parseLong(t)); }
                         catch( Throwable ignore ) { }
                     }
-                    t = (String)volume.getTag("dsnDeviceId");
+                    t = volume.getTag("dsnDeviceId");
                     if( t != null ) {
                         volume.setDeviceId(t);
                     }
@@ -442,18 +416,14 @@ public class DiskSupport extends AbstractVolumeSupport {
             xml = method.get("disk", volumeId + "/attachedVms");
 
             if( xml != null && !xml.equals("") ) {
-                NodeList vms = method.parseXML(xml).getElementsByTagName("Link");
+                NodeList vms = method.parseXML(xml).getElementsByTagName("VmReference");
 
                 if( vms.getLength() > 0 ) {
                     Node vm = vms.item(0);
-                    Node type = vm.getAttributes().getNamedItem("type");
+                    Node href = vm.getAttributes().getNamedItem("href");
 
-                    if( type != null && type.getNodeValue().trim().equalsIgnoreCase(method.getMediaTypeForVApp()) ) {
-                        Node href = vm.getAttributes().getNamedItem("href");
-
-                        if( href != null ) {
-                            volume.setProviderVirtualMachineId(((vCloud)getProvider()).toID(href.getNodeValue().trim()));
-                        }
+                    if( href != null ) {
+                        volume.setProviderVirtualMachineId(((vCloud)getProvider()).toID(href.getNodeValue().trim()));
                     }
                 }
             }
