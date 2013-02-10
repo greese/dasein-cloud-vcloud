@@ -93,8 +93,9 @@ import java.util.TreeSet;
 public class vCloudMethod {
     static public final String[] VERSIONS = { "5.1", "1.5", "1.0", "0.9", "0.8" };
 
-    static public final String INSTANTIATE_VAPP = "instantiateVApp";
+    static public final String CAPTURE_VAPP     = "captureVApp";
     static public final String COMPOSE_VAPP     = "composeVApp";
+    static public final String INSTANTIATE_VAPP = "instantiateVApp";
 
     static public boolean isSupported(@Nonnull String version) {
         for( String v : VERSIONS ) {
@@ -891,8 +892,16 @@ public class vCloudMethod {
         return client;
     }
 
+    public @Nonnull String getMediaTypeForActionAddCatalog() {
+        return "application/vnd.vmware.admin.catalog+xml";
+    }
+
     public @Nonnull String getMediaTypeForActionInstantiateVApp() {
         return "application/vnd.vmware.vcloud.instantiateVAppTemplateParams+xml";
+    }
+
+    public @Nonnull String getMediaTypeForActionCaptureVApp() {
+        return "application/vnd.vmware.vcloud.captureVAppParams+xml";
     }
 
     public @Nonnull String getMediaTypeForActionComposeVApp() {
@@ -909,6 +918,10 @@ public class vCloudMethod {
 
     public @Nonnull String getMediaTypeForCatalog() {
         return "application/vnd.vmware.vcloud.catalog+xml";
+    }
+
+    public @Nonnull String getMediaTypeForCatalogItem() {
+        return "application/vnd.vmware.vcloud.catalogItem+xml";
     }
 
     public @Nonnull String getMediaTypeForGuestConnectionSection() {
@@ -933,6 +946,10 @@ public class vCloudMethod {
 
     public @Nonnull String getMediaTypeForVApp() {
         return "application/vnd.vmware.vcloud.vApp+xml";
+    }
+
+    public @Nonnull String getMediaTypeForVAppTemplate() {
+        return "application/vnd.vmware.vcloud.vAppTemplate+xml";
     }
 
     public @Nonnull String getMediaTypeForVDC() {
@@ -1506,6 +1523,10 @@ public class vCloudMethod {
                 contentType = getMediaTypeForActionComposeVApp();
                 endpoint = vdc.actions.get(contentType);
             }
+            else if( action.equals(CAPTURE_VAPP) ) {
+                contentType = getMediaTypeForActionCaptureVApp();
+                endpoint = vdc.actions.get(contentType);
+            }
             else {
                 throw new CloudException("Unknown content type for post");
             }
@@ -1807,6 +1828,31 @@ public class vCloudMethod {
                 logger.trace("EXIT: " + vCloudMethod.class.getName() + ".put()");
             }
         }
+    }
+
+    public @Nonnull String toAdminURL(@Nonnull String resource, @Nullable String id) throws CloudException, InternalException {
+        Org org = authenticate(false);
+        String url;
+
+        if( id == null ) {
+            if( matches(org.version.version, "1.5", null) ) {
+                url = org.endpoint + "/api/admin/" + resource;
+            }
+            else {
+                url = org.endpoint + "/api/v" + org.version.version + "/admin/" + resource;
+            }
+        }
+        else {
+            String r = (provider.isCompat() ? id : ("/" + resource + "/" + id));
+
+            if( matches(org.version.version, "1.5", null) ) {
+                url = org.endpoint + "/api/admin" + r;
+            }
+            else {
+                url = org.endpoint + "/api/v" + org.version.version + "/admin" + r;
+            }
+        }
+        return url;
     }
 
     public @Nonnull String toURL(@Nonnull String resource, @Nullable String id) throws CloudException, InternalException {

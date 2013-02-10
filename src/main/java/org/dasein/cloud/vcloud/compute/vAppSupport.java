@@ -77,11 +77,13 @@ import java.util.UUID;
 public class vAppSupport extends AbstractVMSupport {
     static private final Logger logger = vCloud.getLogger(vAppSupport.class);
 
+    static public final String PARENT_VAPP_ID = "parentVAppId";
+
     vAppSupport(@Nonnull vCloud provider) {
         super(provider);
     }
 
-    private void deploy(@Nonnull String vmId) throws CloudException, InternalException {
+    public void deploy(@Nonnull String vmId) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("vApp", vmId);
 
@@ -382,7 +384,7 @@ public class vAppSupport extends AbstractVMSupport {
 
                 xml.append("<Info xmlns=\"http://schemas.dmtf.org/ovf/envelope/1\">Specifies Guest OS Customization Settings</Info>");
                 xml.append("<Enabled>true</Enabled>");
-                xml.append("<ChangeSid>false</ChangeSid>");
+                xml.append("<ChangeSid>").append(String.valueOf(img.getPlatform().isWindows())).append("</ChangeSid>");
                 xml.append("<VirtualMachineId>").append(UUID.randomUUID().toString()).append("</VirtualMachineId>");
                 xml.append("<JoinDomainEnabled>false</JoinDomainEnabled>");
                 xml.append("<UseOrgSettings>false</UseOrgSettings>");
@@ -398,6 +400,11 @@ public class vAppSupport extends AbstractVMSupport {
                 }
                 xml.append("<ResetPasswordRequired>false</ResetPasswordRequired>");
                 xml.append("<ComputerName>").append(vCloud.escapeXml(validateHostName(withLaunchOptions.getHostName() + suffix))).append("</ComputerName>");
+                String userData = withLaunchOptions.getUserData();
+
+                if( userData != null && userData.length() > 0 ) {
+                    xml.append("<CustomizationScript>").append(vCloud.escapeXml(userData)).append("</CustomizationScript>");
+                }
                 xml.append("</GuestCustomizationSection>");
 
                 xml.append("</InstantiationParams>");
@@ -895,7 +902,7 @@ public class vAppSupport extends AbstractVMSupport {
         }
     }
 
-    private void stop(@Nonnull String vmId, boolean force, boolean wait) throws CloudException, InternalException {
+    public void stop(@Nonnull String vmId, boolean force, boolean wait) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("vApp", vmId);
 
@@ -1018,7 +1025,7 @@ public class vAppSupport extends AbstractVMSupport {
             if( vm == null ) {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
-            String vappId = (String)vm.getTag("parentVAppId");
+            String vappId = (String)vm.getTag(PARENT_VAPP_ID);
             ArrayList<VirtualMachine> vms = new ArrayList<VirtualMachine>();
             boolean contains = false;
 
@@ -1032,25 +1039,7 @@ public class vAppSupport extends AbstractVMSupport {
             }
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
-            try {
-                stop(vmId, true, true);
-            }
-            catch( Throwable t ) {
-                try { Thread.sleep(30000L); }
-                catch( InterruptedException ignore ) { }
-                try { stop(vmId, true, true); }
-                catch( Throwable ignore ) { }
-            }
             if( vms.size() == 1 && contains ) {
-                try {
-                    stop(vappId, true, true);
-                }
-                catch( Throwable t ) {
-                    try { Thread.sleep(30000L); }
-                    catch( InterruptedException ignore ) { }
-                    try { stop(vappId, true, true); }
-                    catch( Throwable ignore ) { }
-                }
                 try { undeploy(vappId); }
                 catch( Throwable ignore ) { }
                 method.delete("vApp", vappId);
@@ -1429,11 +1418,11 @@ public class vAppSupport extends AbstractVMSupport {
         catch( Throwable ignore ) {
             // ignore
         }
-        vm.setTag("parentVAppId", parentVAppId);
+        vm.setTag(PARENT_VAPP_ID, parentVAppId);
         return vm;
     }
 
-    private void undeploy(@Nonnull String vmId) throws CloudException, InternalException {
+    public void undeploy(@Nonnull String vmId) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("vApp", vmId);
 

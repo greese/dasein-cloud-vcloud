@@ -22,7 +22,6 @@ import org.apache.log4j.Logger;
 import org.dasein.cloud.AsynchronousTask;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.compute.AbstractImageSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageClass;
@@ -33,11 +32,14 @@ import org.dasein.cloud.compute.MachineImageFormat;
 import org.dasein.cloud.compute.MachineImageState;
 import org.dasein.cloud.compute.MachineImageType;
 import org.dasein.cloud.compute.Platform;
+import org.dasein.cloud.compute.VirtualMachine;
+import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
+import org.dasein.util.CalendarWrapper;
 import org.dasein.util.uom.time.Minute;
 import org.dasein.util.uom.time.TimePeriod;
 import org.w3c.dom.Document;
@@ -64,6 +66,7 @@ public class TemplateSupport extends AbstractImageSupport {
 
     static public class Catalog {
         public String catalogId;
+        public String name;
         public boolean published;
         public String owner;
     }
@@ -76,12 +79,151 @@ public class TemplateSupport extends AbstractImageSupport {
     protected MachineImage capture(@Nonnull ImageCreateOptions options, @Nullable AsynchronousTask<MachineImage> task) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "captureImageFromVM");
         try {
-            // TODO: implement custom images
-            throw new OperationNotSupportedException("Image capture is not currently implemented");
+            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            String vmId = options.getVirtualMachineId();
+
+            if( vmId == null ) {
+                throw new CloudException("A capture operation requires a valid VM ID");
+            }
+            VirtualMachine vm = ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().getVirtualMachine(vmId);
+            String vAppId = (vm == null ? null : (String)vm.getTag(vAppSupport.PARENT_VAPP_ID));
+
+            if( vm == null ) {
+                throw new CloudException("No such virtual machine: " + vmId);
+            }
+            else if( vAppId == null ) {
+                throw new CloudException("Unable to determine virtual machine vApp for capture: " + vmId);
+            }
+            long timeout = (System.currentTimeMillis() + CalendarWrapper.MINUTE * 10L);
+
+            while( timeout > System.currentTimeMillis() ) {
+                if( vm == null ) {
+                    throw new CloudException("VM " + vmId + " went away");
+                }
+                if( !vm.getCurrentState().equals(VmState.PENDING) ) {
+                    break;
+                }
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+                try { vm = ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().getVirtualMachine(vmId); }
+                catch( Throwable ignore ) { }
+            }
+            boolean running = !vm.getCurrentState().equals(VmState.STOPPED);
+            String vappId = (String)vm.getTag(vAppSupport.PARENT_VAPP_ID);
+
+            if( running ) {
+                ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().undeploy(vappId);
+            }
+            try {
+                String endpoint = method.toURL("vApp", vAppId);
+                StringBuilder xml = new StringBuilder();
+
+                xml.append("<CaptureVAppParams xmlns=\"http://www.vmware.com/vcloud/v1.5\" xmlns:ovf=\"http://schemas.dmtf.org/ovf/envelope/1\" name=\"").append(vCloud.escapeXml(options.getName())).append("\">");
+                xml.append("<Description>").append(options.getDescription()).append("</Description>");
+                xml.append("<Source href=\"").append(endpoint).append("\" type=\"").append(method.getMediaTypeForVApp()).append("\"/>");
+                xml.append("</CaptureVAppParams>");
+
+                String response = method.post(vCloudMethod.CAPTURE_VAPP, vm.getProviderDataCenterId(), xml.toString());
+
+                if( response.equals("") ) {
+                    throw new CloudException("No error or other information was in the response");
+                }
+                NodeList vapps = method.parseXML(response).getElementsByTagName("VAppTemplate");
+
+                if( vapps.getLength() < 1 ) {
+                    throw new CloudException("No vApp templates were found in response");
+                }
+                Node vapp = vapps.item(0);
+                String imageId = null;
+                Node href = vapp.getAttributes().getNamedItem("href");
+
+                if( href != null ) {
+                    imageId = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                }
+                if( imageId == null || imageId.length() < 1 ) {
+                    throw new CloudException("No imageId was found in response");
+                }
+                MachineImage img = new MachineImage();
+
+                img.setName(options.getName());
+                img.setDescription(options.getDescription());
+                img.setCreationTimestamp(System.currentTimeMillis());
+                img.setProviderMachineImageId(imageId);
+                img = loadVapp(img);
+                if( img == null ) {
+                    throw new CloudException("Image was lost");
+                }
+                method.waitFor(response);
+                publish(img);
+                return img;
+            }
+            finally {
+                if( running ) {
+                    ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().deploy(vappId);
+                }
+            }
         }
         finally {
             APITrace.end();
         }
+    }
+
+    private void publish(@Nonnull MachineImage img) throws CloudException, InternalException {
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        Catalog c = null;
+
+        for( Catalog catalog : listPrivateCatalogs() ) {
+            if( catalog.owner.equals(getContext().getAccountNumber()) ) {
+                c = catalog;
+                if( catalog.name.equals("Standard Catalog") ) {
+                    break;
+                }
+            }
+        }
+        StringBuilder xml;
+
+        if( c == null ) {
+            xml = new StringBuilder();
+            xml.append("<AdminCatalog xmlns=\"http://www.vmware.com/vcloud/v1.5\" name=\"Standard Catalog\">");
+            xml.append("<Description>Standard catalog for custom vApp templates</Description>");
+            xml.append("<IsPublished>false</IsPublished>");
+            xml.append("</AdminCatalog>");
+            String response = method.post("createCatalog", method.toAdminURL("org", getContext().getRegionId()) + "/catalogs", method.getMediaTypeForActionAddCatalog(), xml.toString());
+            String href = null;
+
+            method.waitFor(response);
+            if( !response.equals("") ) {
+                NodeList matches = method.parseXML(response).getElementsByTagName("AdminCatalog");
+
+                for( int i=0; i<matches.getLength(); i++ ) {
+                    Node m = matches.item(i);
+                    Node h = m.getAttributes().getNamedItem("href");
+
+                    if( h != null ) {
+                        href = h.getNodeValue().trim();
+                        break;
+                    }
+                }
+            }
+            if( href == null ) {
+                throw new CloudException("No catalog could be identified for publishing vApp template " + img.getProviderMachineImageId());
+            }
+            c = getCatalog(false, href);
+            if( c == null ) {
+                throw new CloudException("No catalog could be identified for publishing vApp template " + img.getProviderMachineImageId());
+            }
+        }
+
+        xml = new StringBuilder();
+        xml.append("<CatalogItem xmlns:vcloud=\"http://www.vmware.com/vcloud/v1.5\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ");
+        xml.append("name=\"").append(vCloud.escapeXml(img.getName())).append("\">");
+        xml.append("<Description>").append(vCloud.escapeXml(img.getDescription())).append("</Description>");
+        xml.append("<Entity href=\"").append(method.toURL("vAppTemplate", img.getProviderMachineImageId())).append("\" ");
+        xml.append("name=\"").append(vCloud.escapeXml(img.getName())).append("\" ");
+        xml.append("type=\"").append(method.getMediaTypeForVAppTemplate()).append("\" xsi:type=\"").append("vcloud:ResourceReferenceType\"/>");
+        xml.append("</CatalogItem>");
+
+        method.waitFor(method.post("publish", method.toURL("catalog", c.catalogId), method.getMediaTypeForCatalogItem(), xml.toString()));
     }
 
     private @Nullable Catalog getCatalog(boolean published, @Nonnull String href) throws CloudException, InternalException {
@@ -99,6 +241,12 @@ public class TemplateSupport extends AbstractImageSupport {
         for( int i=0; i<cNodes.getLength(); i++ ) {
             Node cnode = cNodes.item(i);
 
+            Node name = cnode.getAttributes().getNamedItem("name");
+            String catalogName = null;
+
+            if( name != null ) {
+                catalogName = name.getNodeValue().trim();
+            }
             if( cnode.hasChildNodes() ) {
                 NodeList attributes = cnode.getChildNodes();
                 String owner = "--public--";
@@ -131,6 +279,7 @@ public class TemplateSupport extends AbstractImageSupport {
                     catalog.catalogId = ((vCloud)getProvider()).toID(href);
                     catalog.published = p;
                     catalog.owner = owner;
+                    catalog.name = catalogName;
                     return catalog;
                 }
             }
@@ -555,8 +704,7 @@ public class TemplateSupport extends AbstractImageSupport {
         image.setArchitecture(Architecture.I64);
         image.setProviderRegionId(getContext().getRegionId());
         image.setSoftware("");
-        image.setStorageFormat(MachineImageFormat.OVF);
-        image.setType(MachineImageType.STORAGE);
+        image.setType(MachineImageType.VOLUME);
         image.setCurrentState(MachineImageState.ACTIVE);
         image.setImageClass(ImageClass.MACHINE);
         StringBuilder ids = new StringBuilder();
@@ -575,7 +723,9 @@ public class TemplateSupport extends AbstractImageSupport {
     public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "removeImage");
         try {
-            // TODO: implement custom catalogs
+            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+
+            method.delete("vAppTemplate", providerImageId);
         }
         finally {
             APITrace.end();
@@ -656,6 +806,11 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     public boolean supportsCustomImages() {
-        return false;
+        return true;
+    }
+
+    @Override
+    public boolean supportsImageCapture(@Nonnull MachineImageType type) throws CloudException, InternalException {
+        return type.equals(MachineImageType.VOLUME);
     }
 }
