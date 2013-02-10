@@ -18,11 +18,11 @@
 
 package org.dasein.cloud.vcloud.compute;
 
-import org.dasein.cloud.CloudProvider;
 import org.dasein.cloud.compute.AbstractComputeServices;
 import org.dasein.cloud.vcloud.vCloud;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Dasein Cloud compute services for vCloud Director.
@@ -46,5 +46,10 @@ public class vCloudComputeServices extends AbstractComputeServices {
     @Override
     public @Nonnull vAppSupport getVirtualMachineSupport() {
         return new vAppSupport(provider);
+    }
+
+    @Override
+    public @Nonnull DiskSupport getVolumeSupport() {
+        return new DiskSupport(provider);
     }
 }

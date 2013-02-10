@@ -95,6 +95,7 @@ public class vCloudMethod {
 
     static public final String CAPTURE_VAPP     = "captureVApp";
     static public final String COMPOSE_VAPP     = "composeVApp";
+    static public final String CREATE_DISK      = "createDisk";
     static public final String INSTANTIATE_VAPP = "instantiateVApp";
 
     static public boolean isSupported(@Nonnull String version) {
@@ -815,6 +816,10 @@ public class vCloudMethod {
         return parts[parts.length-1];
     }
 
+    public @Nonnull String getAPIVersion() throws CloudException, InternalException {
+        return authenticate(false).version.version;
+    }
+
     protected @Nonnull HttpClient getClient(boolean forAuthentication) throws CloudException, InternalException {
         ProviderContext ctx = provider.getContext();
 
@@ -896,6 +901,11 @@ public class vCloudMethod {
         return "application/vnd.vmware.admin.catalog+xml";
     }
 
+
+    public @Nonnull String getMediaTypeForActionAttachVolume() {
+        return "application/vnd.vmware.vcloud.diskAttachOrDetachParams+xml";
+    }
+
     public @Nonnull String getMediaTypeForActionInstantiateVApp() {
         return "application/vnd.vmware.vcloud.instantiateVAppTemplateParams+xml";
     }
@@ -906,6 +916,10 @@ public class vCloudMethod {
 
     public @Nonnull String getMediaTypeForActionComposeVApp() {
         return "application/vnd.vmware.vcloud.composeVAppParams+xml";
+    }
+
+    public @Nonnull String getMediaTypeForActionCreateDisk() {
+        return "application/vnd.vmware.vcloud.diskCreateParams+xml";
     }
 
     public @Nonnull String getMediaTypeForActionDeployVApp() {
@@ -922,6 +936,10 @@ public class vCloudMethod {
 
     public @Nonnull String getMediaTypeForCatalogItem() {
         return "application/vnd.vmware.vcloud.catalogItem+xml";
+    }
+
+    public @Nonnull String getMediaTypeForDisk() {
+        return "application/vnd.vmware.vcloud.disk+xml";
     }
 
     public @Nonnull String getMediaTypeForGuestConnectionSection() {
@@ -1525,6 +1543,10 @@ public class vCloudMethod {
             }
             else if( action.equals(CAPTURE_VAPP) ) {
                 contentType = getMediaTypeForActionCaptureVApp();
+                endpoint = vdc.actions.get(contentType);
+            }
+            else if( action.equals(CREATE_DISK) ) {
+                contentType = getMediaTypeForActionCreateDisk();
                 endpoint = vdc.actions.get(contentType);
             }
             else {
