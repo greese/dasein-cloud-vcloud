@@ -321,6 +321,7 @@ public class vAppSupport extends AbstractVMSupport {
             if( img == null ) {
                 throw new CloudException("No such image: " + withLaunchOptions.getMachineImageId());
             }
+            String apiVersion = method.getAPIVersion();
             StringBuilder xml = new StringBuilder();
 
             xml.append("<ComposeVAppParams xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" name=\"").append(withLaunchOptions.getFriendlyName()).append(" Parent vApp\" xmlns=\"http://www.vmware.com/vcloud/v1.5\">");
@@ -522,27 +523,40 @@ public class vAppSupport extends AbstractVMSupport {
                                         xml.append("</ovf:VirtualHardwareSection>");
                                         method.waitFor(method.put("virtualHardwareSection", vmUrl + "/virtualHardwareSection", method.getMediaTypeForVirtualHardwareSection(), xml.toString()));
                                     }
-                                    Map<String,Object> metadata = withLaunchOptions.getMetaData();
+                                    try {
+                                        Map<String,Object> metadata = withLaunchOptions.getMetaData();
 
-                                    if( metadata == null ) {
-                                        metadata = new HashMap<String, Object>();
-                                    }
-                                    metadata.put("dsnImageId", img.getProviderMachineImageId());
-                                    metadata.put("dsnCreated", String.valueOf(System.currentTimeMillis()));
-                                    xml = new StringBuilder();
-                                    xml.append("<Metadata xmlns=\"http://www.vmware.com/vcloud/v1.5\">");
-                                    for( Map.Entry<String,Object> entry : metadata.entrySet() ) {
-                                        Object value = entry.getValue();
-
-                                        if( value != null ) {
-                                            xml.append("<MetadataEntry>");
-                                            xml.append("<Key>").append(vCloud.escapeXml(entry.getKey())).append("</Key>");
-                                            xml.append("<Value>").append(vCloud.escapeXml(value.toString())).append("</Value>");
-                                            xml.append("</MetadataEntry>");
+                                        if( metadata == null ) {
+                                            metadata = new HashMap<String, Object>();
                                         }
+                                        metadata.put("dsnImageId", img.getProviderMachineImageId());
+                                        metadata.put("dsnCreated", String.valueOf(System.currentTimeMillis()));
+                                        xml = new StringBuilder();
+                                        xml.append("<Metadata xmlns=\"http://www.vmware.com/vcloud/v1.5\" ");
+                                        xml.append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+                                        for( Map.Entry<String,Object> entry : metadata.entrySet() ) {
+                                            Object value = entry.getValue();
+
+                                            if( value != null ) {
+                                                xml.append("<MetadataEntry>");
+                                                xml.append("<Domain>GENERAL</Domain>");
+                                                xml.append("<Key>").append(vCloud.escapeXml(entry.getKey())).append("</Key>");
+                                                if( vCloudMethod.matches(apiVersion, "5.1", null) ) {
+                                                    xml.append("<TypedValue xsi:type=\"MetadataStringValue\">");
+                                                }
+                                                xml.append("<Value>").append(vCloud.escapeXml(value.toString())).append("</Value>");
+                                                if(vCloudMethod.matches(apiVersion, "5.1", null) ) {
+                                                    xml.append("</TypedValue>");
+                                                }
+                                                xml.append("</MetadataEntry>");
+                                            }
+                                        }
+                                        xml.append("</Metadata>");
+                                        method.post("metaData", vmUrl + "/metadata", method.getMediaTypeForMetadata(), xml.toString());
                                     }
-                                    xml.append("</Metadata>");
-                                    method.post("metaData", vmUrl + "/metadata", method.getMediaTypeForMetadata(), xml.toString());
+                                    catch( Throwable ignore ) {
+                                        logger.warn("Error updating meta-data on launch: " + ignore.getMessage());
+                                    }
                                     break;
                                 }
                             }
@@ -1187,6 +1201,9 @@ public class vAppSupport extends AbstractVMSupport {
                     vm.setRootPassword(adminPassword);
                 }
             }
+            else if( attribute.getNodeName().equalsIgnoreCase("DateCreated") && attribute.hasChildNodes() ) {
+                vm.setCreationTimestamp(((vCloud)getProvider()).parseTime(attribute.getFirstChild().getNodeValue().trim()));
+            }
             else if( attribute.getNodeName().equalsIgnoreCase("NetworkConnectionSection") && attribute.hasChildNodes() ) {
                 NodeList elements = attribute.getChildNodes();
                 TreeSet<String> addrs = new TreeSet<String>();
@@ -1382,36 +1399,20 @@ public class vAppSupport extends AbstractVMSupport {
             String xml = method.get("vApp", vm.getProviderVirtualMachineId() + "/metadata");
 
             if( xml != null && !xml.equals("") ) {
-                NodeList md = method.parseXML(xml).getElementsByTagName("MetadataEntry");
+                method.parseMetaData(vm, xml);
 
-                for( int i=0; i<md.getLength(); i++ ) {
-                    Node entry = md.item(i);
+                String t;
 
-                    if( entry.hasChildNodes() ) {
-                        NodeList parts = entry.getChildNodes();
-                        String key = null, value = null;
-
-                        for( int j=0; j<parts.getLength(); j++ ) {
-                            Node part = parts.item(j);
-
-                            if( part.getNodeName().equalsIgnoreCase("Key") && part.hasChildNodes() ) {
-                                key = part.getFirstChild().getNodeValue().trim();
-                            }
-                            else if( part.getNodeName().equalsIgnoreCase("Value") && part.hasChildNodes() ) {
-                                value = part.getFirstChild().getNodeValue().trim();
-                            }
-                        }
-                        if( key != null && value != null ) {
-                            vm.setTag(key, value);
-                            if( key.equals("dsnCreated") ) {
-                                try { vm.setCreationTimestamp(Long.parseLong(value)); }
-                                catch( Throwable ignore ) { }
-                            }
-                            else if( key.equals("dsnImageId") && "unknown".equals(vm.getProviderMachineImageId()) ) {
-                                vm.setProviderMachineImageId(value);
-                            }
-                        }
+                if( vm.getCreationTimestamp() < 1L ) {
+                    t = (String)vm.getTag("dsnCreated");
+                    if( t != null ) {
+                        try { vm.setCreationTimestamp(Long.parseLong(t)); }
+                        catch( Throwable ignore ) { }
                     }
+                }
+                t = (String)vm.getTag("dsnImageId");
+                if( t != null && "unknown".equals(vm.getProviderMachineImageId()) ) {
+                    vm.setProviderMachineImageId(t);
                 }
             }
         }

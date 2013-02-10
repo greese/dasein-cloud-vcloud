@@ -47,6 +47,7 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Taggable;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.dc.Region;
 import org.dasein.cloud.util.APITrace;
@@ -1484,6 +1485,44 @@ public class vCloudMethod {
             }
         }
         throw new CloudException(type, 200, major + ":" + minor, message);
+    }
+
+    public void parseMetaData(@Nonnull Taggable resource, @Nonnull String xml) throws CloudException, InternalException {
+        NodeList md = parseXML(xml).getElementsByTagName("MetadataEntry");
+
+        for( int i=0; i<md.getLength(); i++ ) {
+            Node entry = md.item(i);
+
+            if( entry.hasChildNodes() ) {
+                NodeList parts = entry.getChildNodes();
+                String key = null, value = null;
+
+                for( int j=0; j<parts.getLength(); j++ ) {
+                    Node part = parts.item(j);
+
+                    if( part.getNodeName().equalsIgnoreCase("Key") && part.hasChildNodes() ) {
+                        key = part.getFirstChild().getNodeValue().trim();
+                    }
+                    else if( part.getNodeName().equalsIgnoreCase("TypedValue") && part.hasChildNodes() ) {
+                        NodeList values = part.getChildNodes();
+
+                        for( int k=0; k<values.getLength(); k++ ) {
+                            Node v = values.item(k);
+
+                            if( v.getNodeName().equalsIgnoreCase("Value") && v.hasChildNodes() ) {
+                                value = v.getFirstChild().getNodeValue().trim();
+                            }
+                        }
+                    }
+                    else if( part.getNodeName().equalsIgnoreCase("Value") && part.hasChildNodes() ) {
+                        value = part.getFirstChild().getNodeValue().trim();
+                    }
+                }
+                if( key != null && value != null ) {
+                    resource.setTag(key, value);
+                }
+            }
+        }
     }
 
     public @Nonnull Document parseXML(@Nonnull String xml) throws CloudException, InternalException {
