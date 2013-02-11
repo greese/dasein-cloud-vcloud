@@ -187,6 +187,12 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
         if( nets.getLength() < 1 ) {
             nets = doc.getElementsByTagName("OrgNetwork");
+            if( nets.getLength() < 1 ) {
+                nets = doc.getElementsByTagName("Network");
+                if( nets.getLength() < 1 ) {
+                    return null;
+                }
+            }
         }
         Node netNode = nets.item(0);
         NodeList attributes = netNode.getChildNodes();
@@ -217,7 +223,10 @@ public class HybridVLANSupport extends AbstractVLANSupport {
         }
 
         HashMap<String,String> tags = new HashMap<String, String>();
+        String gateway = null;
+        String netmask = null;
         boolean shared = false;
+        String fenceMode = null;
 
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attribute = attributes.item(i);
@@ -225,15 +234,23 @@ public class HybridVLANSupport extends AbstractVLANSupport {
             if( attribute.getNodeName().equals("Description") && attribute.hasChildNodes() ) {
                 shared = attribute.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
             }
-            if( attribute.getNodeName().equals("IsShared") && attribute.hasChildNodes() ) {
+            else if( attribute.getNodeName().equals("IsShared") && attribute.hasChildNodes() ) {
                 vlan.setDescription(attribute.getFirstChild().getNodeValue().trim());
+            }
+            else if( attribute.getNodeName().equals("Features") && attribute.hasChildNodes() ) {
+                NodeList list = attribute.getChildNodes();
+
+                for( int j=0; j<list.getLength(); j++ ) {
+                    Node feature = list.item(j);
+
+                    if( feature.getNodeName().equalsIgnoreCase("FenceMode") && feature.hasChildNodes() ) {
+                        fenceMode = feature.getFirstChild().getNodeValue().trim();
+                    }
+                }
             }
             else if( attribute.getNodeName().equals("Configuration") && attribute.hasChildNodes() ) {
                 NodeList scopesList = attribute.getChildNodes();
                 String[] dns = new String[10];
-                String fenceMode = null;
-                String gateway = null;
-                String netmask = null;
                 String ipStart = null;
                 String ipEnd = null;
                 String domain = null;
@@ -336,6 +353,12 @@ public class HybridVLANSupport extends AbstractVLANSupport {
                             }
                         }
                     }
+                    else if( attribute.getNodeName().equalsIgnoreCase("Gateway") && attribute.hasChildNodes() ) {
+                        gateway = attribute.getFirstChild().getNodeValue().trim();
+                    }
+                    else if( attribute.getNodeName().equalsIgnoreCase("Netmask") && attribute.hasChildNodes() ) {
+                        netmask = attribute.getFirstChild().getNodeValue().trim();
+                    }
                 }
                 ArrayList<String> dnsServers = new ArrayList<String>();
 
@@ -349,28 +372,28 @@ public class HybridVLANSupport extends AbstractVLANSupport {
                 if( domain != null ) {
                     vlan.setDomainName(domain);
                 }
-                if( fenceMode != null ) {
-                    // isolated
-                    // bridged
-                    // natRouted
-                    tags.put("fenceMode", fenceMode);
-                }
-                if( gateway != null ) {
-                    tags.put("gateway", gateway);
-                }
-                if( netmask != null ) {
-                    tags.put("netmask", netmask);
-                }
                 if( ipStart != null ) {
                     tags.put("ipStart", ipStart);
                 }
                 if( ipEnd != null ) {
                     tags.put("ipEnd", ipEnd);
                 }
-                if( netmask != null && gateway != null ) {
-                    vlan.setCidr(netmask, gateway);
-                }
             }
+        }
+        if( fenceMode != null ) {
+            // isolated
+            // bridged
+            // natRouted
+            tags.put("fenceMode", fenceMode);
+        }
+        if( gateway != null ) {
+            tags.put("gateway", gateway);
+        }
+        if( netmask != null ) {
+            tags.put("netmask", netmask);
+        }
+        if( netmask != null && gateway != null ) {
+            vlan.setCidr(netmask, gateway);
         }
         tags.put("shared", String.valueOf(shared));
         if( vlan.getName() == null ) {

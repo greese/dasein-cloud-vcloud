@@ -31,6 +31,7 @@ import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.ssl.SSLSocketFactory;
@@ -217,7 +218,7 @@ public class vCloudMethod {
             HttpGet get = new HttpGet(endpoint);
 
             get.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-            get.addHeader("x-vcloud-authorization", org.token);
+            addAuth(get, org.token);
 
             if( wire.isDebugEnabled() ) {
                 wire.debug(get.getRequestLine().toString());
@@ -420,7 +421,30 @@ public class vCloudMethod {
                     throw new CloudException(e);
                 }
                 if( status.getStatusCode() == HttpServletResponse.SC_OK ) {
-                    org.token = response.getFirstHeader("x-vcloud-authorization").getValue();
+                    if( matches(getAPIVersion(), "0.8", "0.8") ) {
+                        for( Header h : response.getHeaders("Set-Cookie") ) {
+                            String value = h.getValue();
+
+                            if( value != null ) {
+                                value = value.trim();
+                                if( value.startsWith("vcloud-token") ) {
+                                    value = value.substring("vcloud-token=".length());
+
+                                    int idx = value.indexOf(";");
+
+                                    if( idx == -1 ) {
+                                        org.token = value;
+                                    }
+                                    else {
+                                        org.token = value.substring(0, idx);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        org.token = response.getFirstHeader("x-vcloud-authorization").getValue();
+                    }
                     if( org.token == null ) {
                         throw new CloudException(CloudErrorType.AUTHENTICATION, 200, "Token Empty", "No token was provided");
                     }
@@ -592,6 +616,15 @@ public class vCloudMethod {
         }
     }
 
+    private void addAuth(HttpRequestBase method, @Nonnull String token) throws CloudException, InternalException {
+        if( matches(getAPIVersion(), "0.8", "0.8") ) {
+            method.addHeader("Cookie", "vcloud-token=" + token);
+        }
+        else {
+            method.addHeader("x-vcloud-authorization", token);
+        }
+    }
+
     public @Nullable String delete(@Nonnull String resource, @Nonnull String id) throws CloudException, InternalException {
         if( logger.isTraceEnabled() ) {
             logger.trace("ENTER: " + vCloudMethod.class.getName() + ".delete(" + resource + "," + id + ")");
@@ -609,7 +642,7 @@ public class vCloudMethod {
                 HttpDelete delete = new HttpDelete(endpoint);
 
                 delete.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-                delete.addHeader("x-vcloud-authorization", org.token);
+                addAuth(delete, org.token);
 
                 if( wire.isDebugEnabled() ) {
                     wire.debug(delete.getRequestLine().toString());
@@ -734,7 +767,8 @@ public class vCloudMethod {
                 HttpGet get = new HttpGet(endpoint);
 
                 get.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-                get.addHeader("x-vcloud-authorization", org.token);
+
+                addAuth(get, org.token);
 
                 if( wire.isDebugEnabled() ) {
                     wire.debug(get.getRequestLine().toString());
@@ -769,8 +803,11 @@ public class vCloudMethod {
                     return null;
                 }
                 else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
-                    authenticate(true);
-                    return get(resource, id);
+                    if( matches(getAPIVersion(), "1.0", null) ) {
+                        authenticate(true);
+                        return get(resource, id);
+                    }
+                    return null;
                 }
                 else if( code == HttpServletResponse.SC_NO_CONTENT ) {
                     return "";
@@ -855,7 +892,7 @@ public class vCloudMethod {
     }
 
     public @Nonnull String getAPIVersion() throws CloudException, InternalException {
-        return authenticate(false).version.version;
+        return getVersion().version;
     }
 
     protected @Nonnull HttpClient getClient(boolean forAuthentication) throws CloudException, InternalException {
@@ -923,8 +960,15 @@ public class vCloudMethod {
         }
         if( forAuthentication ) {
             try {
-                String userName = new String(ctx.getAccessPublic(), "utf-8") + "@" + ctx.getAccountNumber();
                 String password = new String(ctx.getAccessPrivate(), "utf-8");
+                String userName;
+
+                if( matches(getAPIVersion(), "0.8", "0.8") ) {
+                    userName = new String(ctx.getAccessPublic(), "utf-8");
+                }
+                else {
+                    userName = new String(ctx.getAccessPublic(), "utf-8") + "@" + ctx.getAccountNumber();
+                }
 
                 client.getCredentialsProvider().setCredentials(new AuthScope(targetHost.getHostName(), targetHost.getPort()), new UsernamePasswordCredentials(userName, password));
             }
@@ -1345,7 +1389,8 @@ public class vCloudMethod {
             HttpGet method =  new HttpGet(org.url);
 
             method.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-            method.addHeader("x-vcloud-authorization", org.token);
+
+            addAuth(method, org.token);
 
             if( wire.isDebugEnabled() ) {
                 wire.debug(method.getRequestLine().toString());
@@ -1655,7 +1700,8 @@ public class vCloudMethod {
                 HttpPost post = new HttpPost(endpoint);
 
                 post.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-                post.addHeader("x-vcloud-authorization", org.token);
+                addAuth(post, org.token);
+
                 if( contentType != null ) {
                     post.addHeader("Content-Type", contentType);
                 }
@@ -1825,7 +1871,9 @@ public class vCloudMethod {
                 HttpPut put = new HttpPut(endpoint);
 
                 put.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-                put.addHeader("x-vcloud-authorization", org.token);
+
+                addAuth(put, org.token);
+
                 if( contentType != null ) {
                     put.addHeader("Content-Type", contentType);
                 }
@@ -1988,7 +2036,7 @@ public class vCloudMethod {
                 url = org.endpoint + "/api/" + resource;
             }
             else {
-                url = org.endpoint + "/api/v" + org.version.version + "/" + resource;
+                url = org.endpoint + "/" + resource;
             }
         }
         else {
@@ -1998,7 +2046,7 @@ public class vCloudMethod {
                 url = org.endpoint + "/api" + r;
             }
             else {
-                url = org.endpoint + "/api/v" + org.version.version + r;
+                url = org.endpoint + r;
             }
         }
         return url;
