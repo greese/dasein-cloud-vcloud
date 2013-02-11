@@ -95,10 +95,6 @@ public class vCloudException extends CloudException {
         super(data.type, data.code, data.title, data.description);
     }
 
-    public vCloudException(@Nonnull Throwable cause) {
-        super(cause);
-    }
-
     public vCloudException(@Nonnull CloudErrorType type, @Nonnegative int code, @Nonnull String title, @Nonnull String description) {
         super(type, code, title, description);
     }

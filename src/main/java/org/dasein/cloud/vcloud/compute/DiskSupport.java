@@ -1,19 +1,22 @@
 package org.dasein.cloud.vcloud.compute;
 
-import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
+import org.dasein.cloud.CloudProvider;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
+import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
-import org.dasein.cloud.compute.AbstractVolumeSupport;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
 import org.dasein.cloud.compute.VolumeCreateOptions;
 import org.dasein.cloud.compute.VolumeFormat;
+import org.dasein.cloud.compute.VolumeProduct;
 import org.dasein.cloud.compute.VolumeState;
+import org.dasein.cloud.compute.VolumeSupport;
 import org.dasein.cloud.compute.VolumeType;
 import org.dasein.cloud.dc.DataCenter;
+import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
@@ -22,23 +25,36 @@ import org.dasein.util.uom.storage.*;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.Date;
 import java.util.Locale;
-import java.util.Map;
 
 /**
  * Implements support for disks in vCloud 5.1 and beyond.
  * <p>Created by George Reese: 2/10/13 12:10 PM</p>
  * @author George Reese
  */
-public class DiskSupport extends AbstractVolumeSupport {
-    static private final Logger logger = vCloud.getLogger(DiskSupport.class);
+public class DiskSupport implements VolumeSupport {
+    private vCloud provider;
 
-    DiskSupport(@Nonnull vCloud provider) { super(provider); }
+    DiskSupport(@Nonnull vCloud provider) { this.provider = provider; }
+
+    protected @Nonnull ProviderContext getContext() throws CloudException {
+        ProviderContext ctx = getProvider().getContext();
+
+        if( ctx == null ) {
+            throw new CloudException("No context was set for this request");
+        }
+        return ctx;
+    }
+
+    protected final @Nonnull CloudProvider getProvider() {
+        return provider;
+    }
 
     @Override
     public void attach(@Nonnull String volumeId, @Nonnull String toServer, @Nonnull String deviceId) throws InternalException, CloudException {
@@ -54,6 +70,89 @@ public class DiskSupport extends AbstractVolumeSupport {
         }
         finally {
             APITrace.end();
+        }
+    }
+
+    @Nonnull
+    @Override
+    public String create(@Nullable String fromSnapshot, @Nonnegative int sizeInGb, @Nonnull String inZone) throws InternalException, CloudException {
+        Storage<Gigabyte> storage = new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE);
+
+        if( getVolumeProductRequirement().equals(Requirement.REQUIRED) ) {
+            VolumeProduct lastChance = null;
+            VolumeProduct closest = null;
+
+            for( VolumeProduct product : listVolumeProducts() ) {
+                if( lastChance == null ) {
+                    lastChance = product;
+                }
+                else {
+                    Float l = lastChance.getMonthlyGigabyteCost();
+                    Float t = product.getMonthlyGigabyteCost();
+
+                    if( l != null && t != null && t < l ) {
+                        lastChance = product;
+                    }
+                }
+                if( isVolumeSizeDeterminedByProduct() ) {
+                    Storage<Gigabyte> size = product.getVolumeSize();
+                    int sz = (size == null ? 0 : size.intValue());
+
+                    if( sz >= sizeInGb ) {
+                        if( closest == null ) {
+                            closest = product;
+                        }
+                        else {
+                            size = closest.getVolumeSize();
+                            if( size == null || size.intValue() > sz ) {
+                                closest = product;
+                            }
+                        }
+                    }
+                }
+                else {
+                    if( closest == null ) {
+                        closest = product;
+                    }
+                    else {
+                        Float c = closest.getMonthlyGigabyteCost();
+                        Float t = product.getMonthlyGigabyteCost();
+
+                        if( c != null && t != null && t < c ) {
+                            closest = product;
+                        }
+                    }
+                }
+            }
+            if( closest == null ) {
+                closest = lastChance;
+            }
+            if( closest != null ) {
+                if( fromSnapshot != null ) {
+                    String name = "Volume from Snapshot " + fromSnapshot;
+                    String description = "Volume created from snapshot #" + fromSnapshot + " on " + (new Date());
+
+                    return createVolume(VolumeCreateOptions.getInstanceForSnapshot(closest.getProviderProductId(), fromSnapshot, storage, name, description, 0));
+                }
+                else {
+                    String name = "New Volume " + System.currentTimeMillis();
+                    String description = "New Volume (created " + (new Date()) + ")";
+
+                    return createVolume(VolumeCreateOptions.getInstance(closest.getProviderProductId(), storage, name, description, 0));
+                }
+            }
+        }
+        if( fromSnapshot != null ) {
+            String name = "Volume from Snapshot " + fromSnapshot;
+            String description = "Volume created from snapshot #" + fromSnapshot + " on " + (new Date());
+
+            return createVolume(VolumeCreateOptions.getInstanceForSnapshot(fromSnapshot, storage, name, description));
+        }
+        else {
+            String name = "New Volume " + System.currentTimeMillis();
+            String description = "New Volume (created " + (new Date()) + ")";
+
+            return createVolume(VolumeCreateOptions.getInstance(storage, name, description));
         }
     }
 
@@ -101,19 +200,6 @@ public class DiskSupport extends AbstractVolumeSupport {
             if( href != null ) {
                 String volumeId = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
 
-                try {
-                    Map<String,Object> meta = options.getMetaData();
-
-                    if( meta == null ) {
-                        meta = new HashMap<String, Object>();
-                    }
-                    meta.put("dsnCreated", System.currentTimeMillis());
-                    meta.put("dsnDeviceId", options.getDeviceId());
-                    method.postMetaData("disk", volumeId, meta);
-                }
-                catch( Throwable ignore ) {
-                    logger.warn("Error updating meta-data on volume creation: " + ignore.getMessage());
-                }
                 String vmId = options.getVlanId();
 
                 if( vmId != null ) {
@@ -143,6 +229,11 @@ public class DiskSupport extends AbstractVolumeSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    @Override
+    public void detach(@Nonnull String volumeId) throws InternalException, CloudException {
+        detach(volumeId, true);
     }
 
     @Override
@@ -235,11 +326,22 @@ public class DiskSupport extends AbstractVolumeSupport {
         return Collections.singletonList(VolumeFormat.BLOCK);
     }
 
+    @Nonnull
+    @Override
+    public Iterable<VolumeProduct> listVolumeProducts() throws InternalException, CloudException {
+        return Collections.emptyList();
+    }
+
     @Override
     public @Nonnull Iterable<ResourceStatus> listVolumeStatus() throws CloudException, InternalException {
         APITrace.begin(getProvider(), "listVolumeStatus");
         try {
-            return super.listVolumeStatus(); // TODO: optimize
+            ArrayList<ResourceStatus> status = new ArrayList<ResourceStatus>();
+
+            for( Volume v : listVolumes() ) {
+                status.add(new ResourceStatus(v.getProviderVolumeId(), v.getCurrentState()));
+            }
+            return status;
         }
         finally {
             APITrace.end();
@@ -390,29 +492,6 @@ public class DiskSupport extends AbstractVolumeSupport {
             }
         }
         try {
-            xml = method.get("disk", volumeId + "/metadata");
-
-            if( xml != null && !xml.equals("") ) {
-                if( xml != null && !xml.equals("") ) {
-                    method.parseMetaData(volume, xml);
-
-                    String t = volume.getTag("dsnCreated");
-
-                    if( t != null ) {
-                        try { volume.setCreationTimestamp(Long.parseLong(t)); }
-                        catch( Throwable ignore ) { }
-                    }
-                    t = volume.getTag("dsnDeviceId");
-                    if( t != null ) {
-                        volume.setDeviceId(t);
-                    }
-                }
-            }
-        }
-        catch( Throwable ignore ) {
-            // ignore
-        }
-        try {
             xml = method.get("disk", volumeId + "/attachedVms");
 
             if( xml != null && !xml.equals("") ) {
@@ -438,5 +517,11 @@ public class DiskSupport extends AbstractVolumeSupport {
             volume.setDescription(volume.getName());
         }
         return volume;
+    }
+
+    @Nonnull
+    @Override
+    public String[] mapServiceAction(@Nonnull ServiceAction action) {
+        return new String[0];  //To change body of implemented methods use File | Settings | File Templates.
     }
 }

@@ -22,7 +22,6 @@ import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.Requirement;
-import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.MachineImage;
@@ -32,6 +31,7 @@ import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineProduct;
 import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.dc.DataCenter;
+import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.util.APITrace;
@@ -74,7 +74,7 @@ import java.util.UUID;
  * @version 2013.04 initial version
  * @since 2013.04
  */
-public class vAppSupport extends AbstractVMSupport {
+public class vAppSupport extends DefunctVM {
     static private final Logger logger = vCloud.getLogger(vAppSupport.class);
 
     static public final String PARENT_VAPP_ID = "parentVAppId";
@@ -1241,7 +1241,7 @@ public class vAppSupport extends AbstractVMSupport {
                     if( addrs.size() == 1 ) {
                         RawAddress a = new RawAddress(addrs.iterator().next());
 
-                        if( a.isPublicIpAddress() ) {
+                        if( isPublicIpAddress(a) ) {
                             vm.setPublicAddresses(a);
                         }
                         else {
@@ -1255,7 +1255,7 @@ public class vAppSupport extends AbstractVMSupport {
                         for( String addr : addrs ) {
                             RawAddress r = new RawAddress(addr);
 
-                            if( r.isPublicIpAddress() ) {
+                            if( isPublicIpAddress(r) ) {
                                 pub.add(r);
                             }
                             else {
@@ -1470,5 +1470,33 @@ public class vAppSupport extends AbstractVMSupport {
             }
         }
         return newName.toString();
+    }
+
+    public boolean isPublicIpAddress(RawAddress addr) {
+        String ipAddress = addr.getIpAddress().toLowerCase();
+
+        if( addr.getVersion().equals(IPVersion.IPV4) ) {
+            if( ipAddress.startsWith("10.") || ipAddress.startsWith("192.168") || ipAddress.startsWith("169.254") ) {
+                return false;
+            }
+            else if( ipAddress.startsWith("172.") ) {
+                String[] parts = ipAddress.split("\\.");
+
+                if( parts.length != 4 ) {
+                    return true;
+                }
+                int x = Integer.parseInt(parts[1]);
+
+                if( x >= 16 && x <= 31 ) {
+                    return false;
+                }
+            }
+        }
+        else {
+            if( ipAddress.startsWith("fd") || ipAddress.startsWith("fc00:")) {
+                return false;
+            }
+        }
+        return true;
     }
 }

@@ -2,9 +2,9 @@ package org.dasein.cloud.vcloud.network;
 
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.dc.DataCenter;
-import org.dasein.cloud.network.AbstractVLANSupport;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.network.VLANState;
@@ -29,7 +29,7 @@ import java.util.Locale;
  * @version 2013.04 initial version
  * @since 2013.04
  */
-public class HybridVLANSupport extends AbstractVLANSupport {
+public class HybridVLANSupport extends DefunctVLAN {
     HybridVLANSupport(@Nonnull vCloud provider) {
         super(provider);
     }
@@ -42,8 +42,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public @Nonnull VLAN createVlan(@Nonnull String cidr, @Nonnull String name, @Nonnull String description, @Nonnull String domainName, @Nonnull String[] dnsServers, @Nonnull String[] ntpServers) throws CloudException, InternalException {
-        // TODO: implement me
-        return super.createVlan(cidr, name, description, domainName, dnsServers, ntpServers);
+        throw new OperationNotSupportedException("Cannot create VLANs");
     }
 
     @Override
@@ -119,8 +118,12 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     public @Nonnull Iterable<ResourceStatus> listVlanStatus() throws CloudException, InternalException {
         APITrace.begin(getProvider(), "listVlanStatus");
         try {
-            // TODO: do this more intelligently
-            return super.listVlanStatus();
+            ArrayList<ResourceStatus> status = new ArrayList<ResourceStatus>();
+
+            for( VLAN vlan : listVlans() ) {
+                status.add(new ResourceStatus(vlan.getProviderVlanId(), vlan.getCurrentState()));
+            }
+            return status;
         }
         finally {
             APITrace.end();
@@ -368,7 +371,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
                     tags.put("ipEnd", ipEnd);
                 }
                 if( netmask != null && gateway != null ) {
-                    vlan.setCidr(netmask, gateway);
+                    setCidr(vlan, netmask, gateway);
                 }
             }
         }
@@ -387,11 +390,55 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     public void removeVlan(String vlanId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "removeVlan");
         try {
-            // TODO: implement me
-            super.removeVlan(vlanId);
+            throw new OperationNotSupportedException("VLAN deletion not yet supported");
         }
         finally {
             APITrace.end();
         }
+    }
+
+    public void setCidr(@Nonnull VLAN vlan, @Nonnull String netmask, @Nonnull String anAddress) {
+        String[] dots = netmask.split("\\.");
+        int cidr = 0;
+
+        for( String item : dots ) {
+            int x = Integer.parseInt(item);
+
+            for( ; x > 0 ; x = (x<<1)%256 ) {
+                cidr++;
+            }
+        }
+        StringBuilder network = new StringBuilder();
+
+        dots = anAddress.split("\\.");
+        int start = 0;
+
+        for( String item : dots ) {
+            if( ((start+8) < cidr) || cidr == 0 ) {
+                network.append(item);
+            }
+            else {
+                int addresses = (int)Math.pow(2, (start+8)-cidr);
+                int subnets = 256/addresses;
+                int gw = Integer.parseInt(item);
+
+                for( int i=0; i<subnets; i++ ) {
+                    int base = i*addresses;
+                    int top = ((i+1)*addresses);
+
+                    if( gw >= base && gw < top ) {
+                        network.append(String.valueOf(base));
+                        break;
+                    }
+                }
+            }
+            start += 8;
+            if( start < 32 ) {
+                network.append(".");
+            }
+        }
+        network.append("/");
+        network.append(String.valueOf(cidr));
+        vlan.setCidr(network.toString());
     }
 }
