@@ -119,8 +119,40 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     public @Nonnull Iterable<ResourceStatus> listVlanStatus() throws CloudException, InternalException {
         APITrace.begin(getProvider(), "listVlanStatus");
         try {
-            // TODO: do this more intelligently
-            return super.listVlanStatus();
+            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            ArrayList<ResourceStatus> status = new ArrayList<ResourceStatus>();
+
+            for( DataCenter dc : method.listDataCenters() ) {
+                String xml = method.get("vdc", dc.getProviderDataCenterId());
+
+                if( xml != null && !xml.equals("") ) {
+                    NodeList vdcs = method.parseXML(xml).getElementsByTagName("Vdc");
+
+                    if( vdcs.getLength() > 0 ) {
+                        NodeList attributes = vdcs.item(0).getChildNodes();
+
+                        for( int i=0; i<attributes.getLength(); i++ ) {
+                            Node attribute = attributes.item(i);
+
+                            if( attribute.getNodeName().equalsIgnoreCase("AvailableNetworks") && attribute.hasChildNodes() ) {
+                                NodeList resources = attribute.getChildNodes();
+
+                                for( int j=0; j<resources.getLength(); j++ ) {
+                                    Node resource = resources.item(j);
+
+                                    if( resource.getNodeName().equalsIgnoreCase("Network") && resource.hasAttributes() ) {
+                                        Node href = resource.getAttributes().getNamedItem("href");
+                                        String id = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+
+                                        status.add(new ResourceStatus(id, VLANState.AVAILABLE));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return status;
         }
         finally {
             APITrace.end();
