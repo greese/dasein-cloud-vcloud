@@ -120,11 +120,22 @@ public class vCloudMethod {
         if( !isSupported(currentVersion) ) {
             return false;
         }
-        boolean greaterThanMaximum = (maximumVersion != null);
+        boolean hasMaximum = (maximumVersion != null);
+        boolean hitMaximum = false;
 
         for( String version : VERSIONS ) {
-            if( greaterThanMaximum ) {
-                greaterThanMaximum = version.equals(maximumVersion); // we already checked equivalence with the maximum
+            if( hasMaximum ) {
+                if( !hitMaximum ) {
+                    hitMaximum = version.equals(maximumVersion); // we already checked equivalence with the maximum
+                }
+                else {
+                    if( minimumVersion.equals(version) ) { // we already checked equivalence with the minimum
+                        return false;
+                    }
+                    if( version.equals(currentVersion) ) {
+                        return true;
+                    }
+                }
             }
             else {
                 if( minimumVersion.equals(version) ) { // we already checked equivalence with the minimum
