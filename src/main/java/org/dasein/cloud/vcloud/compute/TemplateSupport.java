@@ -215,15 +215,15 @@ public class TemplateSupport extends AbstractImageSupport {
         }
 
         xml = new StringBuilder();
-        xml.append("<CatalogItem xmlns:vcloud=\"http://www.vmware.com/vcloud/v1.5\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ");
+        xml.append("<CatalogItem xmlns=\"http://www.vmware.com/vcloud/v1.5\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ");
         xml.append("name=\"").append(vCloud.escapeXml(img.getName())).append("\">");
         xml.append("<Description>").append(vCloud.escapeXml(img.getDescription())).append("</Description>");
         xml.append("<Entity href=\"").append(method.toURL("vAppTemplate", img.getProviderMachineImageId())).append("\" ");
         xml.append("name=\"").append(vCloud.escapeXml(img.getName())).append("\" ");
-        xml.append("type=\"").append(method.getMediaTypeForVAppTemplate()).append("\" xsi:type=\"").append("vcloud:ResourceReferenceType\"/>");
+        xml.append("type=\"").append(method.getMediaTypeForVAppTemplate()).append("\" xsi:type=\"").append("ResourceReferenceType\"/>");
         xml.append("</CatalogItem>");
 
-        method.waitFor(method.post("publish", method.toURL("catalog", c.catalogId), method.getMediaTypeForCatalogItem(), xml.toString()));
+        method.waitFor(method.post("publish", method.toURL("catalog", c.catalogId) + "/catalogItems", method.getMediaTypeForCatalogItem(), xml.toString()));
     }
 
     private @Nullable Catalog getCatalog(boolean published, @Nonnull String href) throws CloudException, InternalException {
