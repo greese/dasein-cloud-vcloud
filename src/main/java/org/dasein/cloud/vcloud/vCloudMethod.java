@@ -169,6 +169,42 @@ public class vCloudMethod {
         this.provider = provider;
     }
 
+    public void checkError(@Nonnull Document xmlDocument) throws CloudException {
+        NodeList tasks;
+
+        try {
+            tasks = xmlDocument.getElementsByTagName("Task");
+        }
+        catch( Throwable ignore ) {
+            return;
+        }
+        if( tasks.getLength() < 1 ) {
+            return;
+        }
+        Node task = tasks.item(0);
+
+        if( task.hasAttributes() ) {
+            Node status = task.getAttributes().getNamedItem("status");
+
+            if( status != null ) {
+                String s = status.getNodeValue().trim();
+
+                if( !s.equals("error") ) {
+                    NodeList elements = task.getChildNodes();
+
+                    for( int i=0; i<elements.getLength(); i++ ) {
+                        Node element = elements.item(i);
+
+                        if( element.getNodeName().equalsIgnoreCase("Error") ) {
+                            parseError(element);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private void loadOrg(@Nonnull String endpoint, @Nonnull Org org, @Nonnull String orgId) throws CloudException, InternalException {
         String xml;
 
@@ -1759,7 +1795,6 @@ public class vCloudMethod {
 
             if( value != null ) {
                 xml.append("<MetadataEntry>");
-                xml.append("<Domain>GENERAL</Domain>");
                 xml.append("<Key>").append(vCloud.escapeXml(entry.getKey())).append("</Key>");
                 if( vCloudMethod.matches(apiVersion, "5.1", null) ) {
                     xml.append("<TypedValue xsi:type=\"MetadataStringValue\">");

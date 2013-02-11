@@ -128,7 +128,35 @@ public class TemplateSupport extends AbstractImageSupport {
                 if( response.equals("") ) {
                     throw new CloudException("No error or other information was in the response");
                 }
-                NodeList vapps = method.parseXML(response).getElementsByTagName("VAppTemplate");
+                Document doc = method.parseXML(response);
+
+                try {
+                    method.checkError(doc);
+                }
+                catch( CloudException e ) {
+                    if( e.getMessage().contains("Stop the vApp and try again") ) {
+                        logger.warn("The cloud thinks the vApp or VM is still running; going to check what's going on: " + e.getMessage());
+                        vm = ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().getVirtualMachine(vmId);
+                        if( vm == null ) {
+                            throw new CloudException("Virtual machine went away");
+                        }
+                        if( !vm.getCurrentState().equals(VmState.STOPPED) ) {
+                            logger.warn("Current state of VM: " + vm.getCurrentState());
+                            ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().undeploy(vappId);
+                        }
+                        response = method.post(vCloudMethod.CAPTURE_VAPP, vm.getProviderDataCenterId(), xml.toString());
+                        if( response.equals("") ) {
+                            throw new CloudException("No error or other information was in the response");
+                        }
+                        doc = method.parseXML(response);
+                        method.checkError(doc);
+                    }
+                    else {
+                        throw e;
+                    }
+                }
+
+                NodeList vapps = doc.getElementsByTagName("VAppTemplate");
 
                 if( vapps.getLength() < 1 ) {
                     throw new CloudException("No vApp templates were found in response");
