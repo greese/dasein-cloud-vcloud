@@ -977,14 +977,12 @@ public class vCloudMethod {
                 String password = new String(ctx.getAccessPrivate(), "utf-8");
                 String userName;
 
-                System.out.println("Matches=" + matches(getAPIVersion(), "0.8", "0.8"));
                 if( matches(getAPIVersion(), "0.8", "0.8") ) {
                     userName = new String(ctx.getAccessPublic(), "utf-8");
                 }
                 else {
                     userName = new String(ctx.getAccessPublic(), "utf-8") + "@" + ctx.getAccountNumber();
                 }
-                System.out.println("User name=" + userName);
                 client.getCredentialsProvider().setCredentials(new AuthScope(targetHost.getHostName(), targetHost.getPort()), new UsernamePasswordCredentials(userName, password));
             }
             catch( UnsupportedEncodingException e ) {
