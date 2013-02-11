@@ -224,7 +224,7 @@
                 </property>
             </systemProperties>
           <includes>
-            <!-- <include>**/vCloudTestSuite.java</include> -->
+            <include>**/vCloudTestSuite.java</include>
           </includes>
         </configuration>
       </plugin>     
