@@ -120,11 +120,22 @@ public class vCloudMethod {
         if( !isSupported(currentVersion) ) {
             return false;
         }
-        boolean greaterThanMaximum = (maximumVersion != null);
+        boolean hasMaximum = (maximumVersion != null);
+        boolean hitMaximum = false;
 
         for( String version : VERSIONS ) {
-            if( greaterThanMaximum ) {
-                greaterThanMaximum = version.equals(maximumVersion); // we already checked equivalence with the maximum
+            if( hasMaximum ) {
+                if( !hitMaximum ) {
+                    hitMaximum = version.equals(maximumVersion); // we already checked equivalence with the maximum
+                }
+                else {
+                    if( minimumVersion.equals(version) ) { // we already checked equivalence with the minimum
+                        return false;
+                    }
+                    if( version.equals(currentVersion) ) {
+                        return true;
+                    }
+                }
             }
             else {
                 if( minimumVersion.equals(version) ) { // we already checked equivalence with the minimum
@@ -590,6 +601,7 @@ public class vCloudMethod {
                             }
                         }
                         if( data == null ) {
+                            logger.error("Received an error from " + provider.getCloudName() + " with no data: " + status.getStatusCode() + "/" + response.getStatusLine().getReasonPhrase());
                             throw new vCloudException(CloudErrorType.GENERAL, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
                         }
                         logger.error("[" +  status.getStatusCode() + " : " + data.title + "] " + data.description);
@@ -617,12 +629,14 @@ public class vCloudMethod {
     }
 
     private void addAuth(HttpRequestBase method, @Nonnull String token) throws CloudException, InternalException {
+        method.addHeader("Cookie", "vcloud-token=" + token);
+        method.addHeader("x-vcloud-authorization", token);
+        /*
         if( matches(getAPIVersion(), "0.8", "0.8") ) {
-            method.addHeader("Cookie", "vcloud-token=" + token);
         }
         else {
-            method.addHeader("x-vcloud-authorization", token);
         }
+        */
     }
 
     public @Nullable String delete(@Nonnull String resource, @Nonnull String id) throws CloudException, InternalException {
@@ -963,13 +977,14 @@ public class vCloudMethod {
                 String password = new String(ctx.getAccessPrivate(), "utf-8");
                 String userName;
 
+                System.out.println("Matches=" + matches(getAPIVersion(), "0.8", "0.8"));
                 if( matches(getAPIVersion(), "0.8", "0.8") ) {
                     userName = new String(ctx.getAccessPublic(), "utf-8");
                 }
                 else {
                     userName = new String(ctx.getAccessPublic(), "utf-8") + "@" + ctx.getAccountNumber();
                 }
-
+                System.out.println("User name=" + userName);
                 client.getCredentialsProvider().setCredentials(new AuthScope(targetHost.getHostName(), targetHost.getPort()), new UsernamePasswordCredentials(userName, password));
             }
             catch( UnsupportedEncodingException e ) {
@@ -1982,6 +1997,7 @@ public class vCloudMethod {
                         }
                     }
                     if( data == null ) {
+                        logger.error("Received an error from " + provider.getCloudName() + " with no data: " + code + "/" + response.getStatusLine().getReasonPhrase());
                         throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
                     }
                     logger.error("[" +  code + " : " + data.title + "] " + data.description);
