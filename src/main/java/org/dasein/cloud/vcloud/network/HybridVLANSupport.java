@@ -396,7 +396,7 @@ public class HybridVLANSupport extends DefunctVLAN {
             tags.put("netmask", netmask);
         }
         if( netmask != null && gateway != null ) {
-            vlan.setCidr(netmask, gateway);
+            setCidr(vlan, netmask, gateway);
         }
         tags.put("shared", String.valueOf(shared));
         if( vlan.getName() == null ) {
