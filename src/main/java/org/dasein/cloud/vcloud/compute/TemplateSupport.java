@@ -461,11 +461,6 @@ public class TemplateSupport extends AbstractImageSupport {
     public @Nonnull Iterable<MachineImage> listImages(@Nullable ImageFilterOptions options) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "listImages");
         try {
-            ImageClass cls = (options == null ? null : options.getImageClass());
-
-            if( cls != null && !cls.equals(ImageClass.MACHINE) ) {
-                return Collections.emptyList();
-            }
             ArrayList<MachineImage> images = new ArrayList<MachineImage>();
 
             for( Catalog catalog : listPrivateCatalogs() ) {
@@ -761,21 +756,9 @@ public class TemplateSupport extends AbstractImageSupport {
     }
 
     @Override
-    public @Nonnull Iterable<MachineImage> searchPublicImages(@Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass ... imageClasses) throws CloudException, InternalException {
+    public @Nonnull Iterable<MachineImage> searchPublicImages(@Nonnull ImageFilterOptions options) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "searchPublicImages");
         try {
-            if( imageClasses != null ) {
-                boolean ok = false;
-
-                for( ImageClass cls : imageClasses ) {
-                    if( cls.equals(ImageClass.MACHINE) ) {
-                        ok = true;
-                    }
-                }
-                if( ok ) {
-                    return Collections.emptyList();
-                }
-            }
             ArrayList<MachineImage> images = new ArrayList<MachineImage>();
 
             for( Catalog catalog : listPublicCatalogs() ) {
@@ -812,7 +795,7 @@ public class TemplateSupport extends AbstractImageSupport {
 
                                             if( image != null ) {
                                                 image.setProviderOwnerId(catalog.owner);
-                                                if( matches(image, keyword, platform, architecture, imageClasses) ) {
+                                                if( options == null || options.matches(image) ) {
                                                     images.add(image);
                                                 }
                                             }
