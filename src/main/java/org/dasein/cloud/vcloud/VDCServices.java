@@ -52,7 +52,7 @@ public class VDCServices implements DataCenterServices {
 
     @Override
     public @Nullable DataCenter getDataCenter(@Nonnull String providerDataCenterId) throws InternalException, CloudException {
-        APITrace.begin(provider, "getDataCenter");
+        APITrace.begin(provider, "DC.getDataCenter");
         try {
             for( Region region : listRegions() ) {
                 for( DataCenter dc : listDataCenters(region.getProviderRegionId()) ) {
@@ -80,7 +80,7 @@ public class VDCServices implements DataCenterServices {
 
     @Override
     public @Nullable Region getRegion(@Nonnull String providerRegionId) throws InternalException, CloudException {
-        APITrace.begin(provider, "getRegion");
+        APITrace.begin(provider, "DC.getRegion");
         try {
             for( Region region : listRegions() ) {
                 if( providerRegionId.equals(region.getProviderRegionId()) ) {
@@ -104,7 +104,7 @@ public class VDCServices implements DataCenterServices {
         if( !providerRegionId.equals(ctx.getRegionId()) ) {
             return Collections.emptyList();
         }
-        APITrace.begin(provider, "listDataCenters");
+        APITrace.begin(provider, "DC.listDataCenters");
         try {
             return (new vCloudMethod(provider)).listDataCenters();
         }
@@ -115,7 +115,7 @@ public class VDCServices implements DataCenterServices {
 
     @Override
     public @Nonnull Collection<Region> listRegions() throws InternalException, CloudException {
-        APITrace.begin(provider, "listRegions");
+        APITrace.begin(provider, "DC.listRegions");
         try {
             return Collections.singletonList((new vCloudMethod(provider)).getRegion());
         }

@@ -285,7 +285,7 @@ public class vCloud extends AbstractCloud {
 
     @Override
     public String testContext() {
-        APITrace.begin(this, "testContext");
+        APITrace.begin(this, "Cloud.testContext");
         try {
             ProviderContext ctx = getContext();
 

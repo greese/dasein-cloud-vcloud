@@ -2,15 +2,18 @@ package org.dasein.cloud.vcloud.network;
 
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.AbstractVLANSupport;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.network.VLANState;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.Cache;
+import org.dasein.cloud.util.CacheLevel;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
+import org.dasein.util.uom.time.Minute;
+import org.dasein.util.uom.time.TimePeriod;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -48,7 +51,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public int getMaxVlanCount() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "getMaxVlanCount");
+        APITrace.begin(getProvider(), "VLAN.getMaxVlanCount");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
@@ -76,7 +79,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public VLAN getVlan(@Nonnull String vlanId) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "getVlan");
+        APITrace.begin(getProvider(), "VLAN.getVlan");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
@@ -96,7 +99,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "isSubscribedVLAN");
+        APITrace.begin(getProvider(), "VLAN.isSubscribed");
         try {
             return (getProvider().testContext() != null);
         }
@@ -116,53 +119,15 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     }
 
     @Override
-    public @Nonnull Iterable<ResourceStatus> listVlanStatus() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "listVlanStatus");
-        try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-            ArrayList<ResourceStatus> status = new ArrayList<ResourceStatus>();
-
-            for( DataCenter dc : method.listDataCenters() ) {
-                String xml = method.get("vdc", dc.getProviderDataCenterId());
-
-                if( xml != null && !xml.equals("") ) {
-                    NodeList vdcs = method.parseXML(xml).getElementsByTagName("Vdc");
-
-                    if( vdcs.getLength() > 0 ) {
-                        NodeList attributes = vdcs.item(0).getChildNodes();
-
-                        for( int i=0; i<attributes.getLength(); i++ ) {
-                            Node attribute = attributes.item(i);
-
-                            if( attribute.getNodeName().equalsIgnoreCase("AvailableNetworks") && attribute.hasChildNodes() ) {
-                                NodeList resources = attribute.getChildNodes();
-
-                                for( int j=0; j<resources.getLength(); j++ ) {
-                                    Node resource = resources.item(j);
-
-                                    if( resource.getNodeName().equalsIgnoreCase("Network") && resource.hasAttributes() ) {
-                                        Node href = resource.getAttributes().getNamedItem("href");
-                                        String id = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
-
-                                        status.add(new ResourceStatus(id, VLANState.AVAILABLE));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return status;
-        }
-        finally {
-            APITrace.end();
-        }
-    }
-
-    @Override
     public @Nonnull Iterable<VLAN> listVlans() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "listVlans");
+        APITrace.begin(getProvider(), "VLAN.listVlans");
         try {
+            Cache<VLAN> cache = Cache.getInstance(getProvider(), "networks", VLAN.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(5, TimePeriod.MINUTE));
+            Iterable<VLAN> cached = cache.get(getContext());
+
+            if( cached != null ) {
+                return cached;
+            }
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             ArrayList<VLAN> vlans = new ArrayList<VLAN>();
 
@@ -199,6 +164,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
                     }
                 }
             }
+            cache.put(getContext(), vlans);
             return vlans;
         }
         finally {
@@ -440,7 +406,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
 
     @Override
     public void removeVlan(String vlanId) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "removeVlan");
+        APITrace.begin(getProvider(), "VLAN.removeVlan");
         try {
             // TODO: implement me
             super.removeVlan(vlanId);

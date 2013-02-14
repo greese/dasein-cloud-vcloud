@@ -40,6 +40,9 @@ import org.dasein.cloud.util.CacheLevel;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
 import org.dasein.util.CalendarWrapper;
+import org.dasein.util.Jiterator;
+import org.dasein.util.JiteratorPopulator;
+import org.dasein.util.PopulatorThread;
 import org.dasein.util.uom.time.Minute;
 import org.dasein.util.uom.time.TimePeriod;
 import org.w3c.dom.Document;
@@ -77,7 +80,7 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     protected MachineImage capture(@Nonnull ImageCreateOptions options, @Nullable AsynchronousTask<MachineImage> task) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "captureImageFromVM");
+        APITrace.begin(getProvider(), "Image.capture");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             String vmId = options.getVirtualMachineId();
@@ -318,7 +321,7 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     public MachineImage getImage(@Nonnull String providerImageId) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "getImage");
+        APITrace.begin(getProvider(), "Image.getImage");
         try {
             for( MachineImage image : listImages((ImageFilterOptions)null) ) {
                 if( image.getProviderMachineImageId().equals(providerImageId) ) {
@@ -344,7 +347,7 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     public boolean isImageSharedWithPublic(@Nonnull String machineImageId) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "isImageSharedWithPublic");
+        APITrace.begin(getProvider(), "Image.isImageSharedWithPublic");
         try {
             MachineImage img = getImage(machineImageId);
 
@@ -362,7 +365,7 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "isSubscribedImage");
+        APITrace.begin(getProvider(), "Image.isSubscribed");
         try {
             return (getProvider().testContext() != null);
         }
@@ -458,63 +461,74 @@ public class TemplateSupport extends AbstractImageSupport {
     }
 
     @Override
-    public @Nonnull Iterable<MachineImage> listImages(@Nullable ImageFilterOptions options) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "listImages");
-        try {
-            ArrayList<MachineImage> images = new ArrayList<MachineImage>();
+    public @Nonnull Iterable<MachineImage> listImages(final @Nullable ImageFilterOptions options) throws CloudException, InternalException {
+        getProvider().hold();
+        PopulatorThread<MachineImage> populator = new PopulatorThread<MachineImage>(new JiteratorPopulator<MachineImage>() {
+            @Override
+            public void populate(@Nonnull Jiterator<MachineImage> iterator) throws Exception {
+                try {
+                    APITrace.begin(getProvider(), "Image.listImages");
+                    try {
+                        for( Catalog catalog : listPrivateCatalogs() ) {
+                            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+                            String xml = method.get("catalog", catalog.catalogId);
 
-            for( Catalog catalog : listPrivateCatalogs() ) {
-                vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-                String xml = method.get("catalog", catalog.catalogId);
+                            if( xml == null ) {
+                                logger.warn("Unable to find catalog " + catalog.catalogId + " indicated by org " + getContext().getAccountNumber());
+                                continue;
+                            }
+                            Document doc = method.parseXML(xml);
+                            NodeList cNodes = doc.getElementsByTagName("Catalog");
 
-                if( xml == null ) {
-                    logger.warn("Unable to find catalog " + catalog.catalogId + " indicated by org " + getContext().getAccountNumber());
-                    continue;
-                }
-                Document doc = method.parseXML(xml);
-                NodeList cNodes = doc.getElementsByTagName("Catalog");
+                            for( int i=0; i<cNodes.getLength(); i++ ) {
+                                Node cnode = cNodes.item(i);
 
-                for( int i=0; i<cNodes.getLength(); i++ ) {
-                    Node cnode = cNodes.item(i);
+                                if( cnode.hasChildNodes() ) {
+                                    NodeList items = cnode.getChildNodes();
 
-                    if( cnode.hasChildNodes() ) {
-                        NodeList items = cnode.getChildNodes();
+                                    for( int j=0; j<items.getLength(); j++ ) {
+                                        Node wrapper = items.item(j);
 
-                        for( int j=0; j<items.getLength(); j++ ) {
-                            Node wrapper = items.item(j);
+                                        if( wrapper.getNodeName().equalsIgnoreCase("CatalogItems") && wrapper.hasChildNodes() ) {
+                                            NodeList entries = wrapper.getChildNodes();
 
-                            if( wrapper.getNodeName().equalsIgnoreCase("CatalogItems") && wrapper.hasChildNodes() ) {
-                                NodeList entries = wrapper.getChildNodes();
+                                            for( int k=0; k<entries.getLength(); k++ ) {
+                                                Node item = entries.item(k);
 
-                                for( int k=0; k<entries.getLength(); k++ ) {
-                                    Node item = entries.item(k);
+                                                if( item.getNodeName().equalsIgnoreCase("CatalogItem") && item.hasAttributes() ) {
+                                                    Node href = item.getAttributes().getNamedItem("href");
 
-                                    if( item.getNodeName().equalsIgnoreCase("CatalogItem") && item.hasAttributes() ) {
-                                        Node href = item.getAttributes().getNamedItem("href");
+                                                    if( href != null ) {
+                                                        MachineImage image = loadTemplate(((vCloud)getProvider()).toID(href.getNodeValue().trim()));
 
-                                        if( href != null ) {
-                                            MachineImage image = loadTemplate(((vCloud)getProvider()).toID(href.getNodeValue().trim()));
-
-                                            if( image != null ) {
-                                                image.setProviderOwnerId(catalog.owner);
-                                                if( options == null || options.matches(image) ) {
-                                                    images.add(image);
+                                                        if( image != null ) {
+                                                            image.setProviderOwnerId(catalog.owner);
+                                                            if( options == null || options.matches(image) ) {
+                                                                iterator.push(image);
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
+
                             }
                         }
                     }
-
+                    finally {
+                        APITrace.end();
+                    }
+                }
+                finally {
+                    getProvider().release();
                 }
             }
-            return images;
-        }
-        finally {
-            APITrace.end();
-        }
+        });
+
+        populator.populate();
+        return populator.getResult();
     }
 
     @Override
@@ -744,7 +758,7 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "removeImage");
+        APITrace.begin(getProvider(), "Image.remove");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
@@ -757,7 +771,7 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     public @Nonnull Iterable<MachineImage> searchPublicImages(@Nonnull ImageFilterOptions options) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "searchPublicImages");
+        APITrace.begin(getProvider(), "Image.searchPublicImages");
         try {
             ArrayList<MachineImage> images = new ArrayList<MachineImage>();
 

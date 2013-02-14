@@ -42,7 +42,7 @@ public class DiskSupport extends AbstractVolumeSupport {
 
     @Override
     public void attach(@Nonnull String volumeId, @Nonnull String toServer, @Nonnull String deviceId) throws InternalException, CloudException {
-        APITrace.begin(getProvider(), "attachVolume");
+        APITrace.begin(getProvider(), "Volume.attachVolume");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             StringBuilder xml = new StringBuilder();
@@ -65,7 +65,7 @@ public class DiskSupport extends AbstractVolumeSupport {
         if( options.getSnapshotId() != null ) {
             throw new OperationNotSupportedException("Volumes created from snapshots make no sense when there are no snapshots");
         }
-        APITrace.begin(getProvider(), "createVolume");
+        APITrace.begin(getProvider(), "Volume.createVolume");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             String vdcId = options.getDataCenterId();
@@ -147,7 +147,7 @@ public class DiskSupport extends AbstractVolumeSupport {
 
     @Override
     public void detach(@Nonnull String volumeId, boolean force) throws InternalException, CloudException {
-        APITrace.begin(getProvider(), "detachVolume");
+        APITrace.begin(getProvider(), "Volume.detach");
         try {
             Volume volume = getVolume(volumeId);
 
@@ -194,7 +194,7 @@ public class DiskSupport extends AbstractVolumeSupport {
 
     @Override
     public Volume getVolume(@Nonnull String volumeId) throws InternalException, CloudException {
-        APITrace.begin(getProvider(), "getVolume");
+        APITrace.begin(getProvider(), "Volume.getVolume");
         try {
             for( Volume v : listVolumes() ) {
                 if( v.getProviderVolumeId().equals(volumeId) ) {
@@ -237,7 +237,7 @@ public class DiskSupport extends AbstractVolumeSupport {
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listVolumeStatus() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "listVolumeStatus");
+        APITrace.begin(getProvider(), "Volume.listVolumeStatus");
         try {
             return super.listVolumeStatus(); // TODO: optimize
         }
@@ -248,7 +248,7 @@ public class DiskSupport extends AbstractVolumeSupport {
 
     @Override
     public @Nonnull Iterable<Volume> listVolumes() throws InternalException, CloudException {
-        APITrace.begin(getProvider(), "listVolumes");
+        APITrace.begin(getProvider(), "Volume.listVolumes");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             ArrayList<Volume> volumes = new ArrayList<Volume>();
@@ -298,7 +298,7 @@ public class DiskSupport extends AbstractVolumeSupport {
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "isSubscribedDisk");
+        APITrace.begin(getProvider(), "Volume.isSubscribed");
         try {
             if( getProvider().testContext() != null ) {
                 vCloudMethod method = new vCloudMethod(((vCloud)getProvider()));
@@ -315,7 +315,7 @@ public class DiskSupport extends AbstractVolumeSupport {
 
     @Override
     public void remove(@Nonnull String volumeId) throws InternalException, CloudException {
-        APITrace.begin(getProvider(), "removeVolume");
+        APITrace.begin(getProvider(), "Volume.remove");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
