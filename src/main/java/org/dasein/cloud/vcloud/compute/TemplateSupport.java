@@ -49,6 +49,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -174,13 +175,8 @@ public class TemplateSupport extends AbstractImageSupport {
                 if( imageId == null || imageId.length() < 1 ) {
                     throw new CloudException("No imageId was found in response");
                 }
-                MachineImage img = new MachineImage();
+                MachineImage img = loadVapp(imageId, getContext().getAccountNumber(), options.getName(), options.getDescription(), System.currentTimeMillis());
 
-                img.setName(options.getName());
-                img.setDescription(options.getDescription());
-                img.setCreationTimestamp(System.currentTimeMillis());
-                img.setProviderMachineImageId(imageId);
-                img = loadVapp(img);
                 if( img == null ) {
                     throw new CloudException("Image was lost");
                 }
@@ -499,10 +495,9 @@ public class TemplateSupport extends AbstractImageSupport {
                                                     Node href = item.getAttributes().getNamedItem("href");
 
                                                     if( href != null ) {
-                                                        MachineImage image = loadTemplate(((vCloud)getProvider()).toID(href.getNodeValue().trim()));
+                                                        MachineImage image = loadTemplate(catalog.owner, ((vCloud)getProvider()).toID(href.getNodeValue().trim()));
 
                                                         if( image != null ) {
-                                                            image.setProviderOwnerId(catalog.owner);
                                                             if( options == null || options.matches(image) ) {
                                                                 iterator.push(image);
                                                             }
@@ -541,7 +536,7 @@ public class TemplateSupport extends AbstractImageSupport {
         return Collections.emptyList();
     }
 
-    private @Nullable MachineImage loadTemplate(@Nonnull String catalogItemId) throws CloudException, InternalException {
+    private @Nullable MachineImage loadTemplate(@Nonnull String ownerId, @Nonnull String catalogItemId) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("catalogItem", catalogItemId);
 
@@ -558,15 +553,15 @@ public class TemplateSupport extends AbstractImageSupport {
         Node item = items.item(0);
 
         if( item.hasAttributes() && item.hasChildNodes() ) {
-            MachineImage image = new MachineImage();
             Node name = item.getAttributes().getNamedItem("name");
+            String imageName = null, imageDescription = null;
+            long createdAt = 0L;
 
             if( name != null ) {
                 String n = name.getNodeValue().trim();
 
                 if( n.length() > 0 ) {
-                    image.setName(n);
-                    image.setDescription(n);
+                    imageName = n;
                 }
             }
             NodeList entries = item.getChildNodes();
@@ -579,14 +574,11 @@ public class TemplateSupport extends AbstractImageSupport {
                     String d = entry.getFirstChild().getNodeValue().trim();
 
                     if( d.length() > 0 ) {
-                        image.setDescription(d);
-                        if( image.getName() == null ) {
-                            image.setName(d);
-                        }
+                        imageDescription = d;
                     }
                 }
                 else if( entry.getNodeName().equalsIgnoreCase("datecreated") && entry.hasChildNodes() ) {
-                    image.setCreationTimestamp(((vCloud)getProvider()).parseTime(entry.getFirstChild().getNodeValue().trim()));
+                    createdAt = ((vCloud)getProvider()).parseTime(entry.getFirstChild().getNodeValue().trim());
                 }
                 else if( entry.getNodeName().equalsIgnoreCase("entity") && entry.hasAttributes() ) {
                     Node href = entry.getAttributes().getNamedItem("href");
@@ -597,17 +589,16 @@ public class TemplateSupport extends AbstractImageSupport {
                 }
             }
             if( vappId != null ) {
-                image.setProviderMachineImageId(vappId);
-                return loadVapp(image);
+                return loadVapp(vappId, ownerId, imageName, imageDescription, createdAt);
             }
         }
         return null;
     }
-
-    private @Nullable MachineImage loadVapp(@Nonnull MachineImage image) throws CloudException, InternalException {
+    //imageId, options.getName(), options.getDescription(), System.currentTimeMillis()
+    private @Nullable MachineImage loadVapp(@Nonnull String imageId, @Nonnull String ownerId, @Nullable String name, @Nullable String description, @Nonnegative long createdAt) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
-        String xml = method.get("vAppTemplate", image.getProviderMachineImageId());
+        String xml = method.get("vAppTemplate", imageId);
 
         if( xml == null ) {
             return null;
@@ -621,32 +612,31 @@ public class TemplateSupport extends AbstractImageSupport {
         Node template = templates.item(0);
         TreeSet<String> childVms = new TreeSet<String>();
 
-        if( image.getName() == null ) {
+        if( name == null ) {
             Node node = template.getAttributes().getNamedItem("name");
 
             if( node != null ) {
                 String n = node.getNodeValue().trim();
 
                 if( n.length() > 0 ) {
-                    image.setName(n);
-                    if( image.getDescription() == null ) {
-                        image.setDescription(n);
-                    }
+                    name = n;
                 }
             }
         }
         NodeList attributes = template.getChildNodes();
+        Platform platform = Platform.UNKNOWN;
+        Architecture architecture = Architecture.I64;
 
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attribute = attributes.item(i);
 
-            if( attribute.getNodeName().equalsIgnoreCase("description") && image.getDescription() == null && attribute.hasChildNodes() ) {
+            if( attribute.getNodeName().equalsIgnoreCase("description") && description == null && attribute.hasChildNodes() ) {
                 String d = attribute.getFirstChild().getNodeValue().trim();
 
                 if( d.length() > 0 ) {
-                    image.setDescription(d);
-                    if( image.getName() == null ) {
-                        image.setName(d);
+                    description = d;
+                    if( name == null ) {
+                        name = d;
                     }
                 }
             }
@@ -677,11 +667,11 @@ public class TemplateSupport extends AbstractImageSupport {
                                         String n = cust.getFirstChild().getNodeValue().trim();
 
                                         if( n.length() > 0 ) {
-                                            if( image.getName() == null ) {
-                                                image.setName(n);
+                                            if( name == null ) {
+                                                name = n;
                                             }
                                             else {
-                                                image.setName(image.getName() + " - " + n);
+                                                name = name + " - " + n;
                                             }
                                         }
                                     }
@@ -697,7 +687,7 @@ public class TemplateSupport extends AbstractImageSupport {
                                         String n = prd.getFirstChild().getNodeValue().trim();
 
                                         if( n.length() > 0 ) {
-                                            image.setPlatform(Platform.guess(n));
+                                            platform = Platform.guess(n);
                                         }
                                     }
                                 }
@@ -711,10 +701,10 @@ public class TemplateSupport extends AbstractImageSupport {
                                     if( osdesc.getNodeName().equalsIgnoreCase("ovf:Description") && osdesc.hasChildNodes() ) {
                                         String desc = osdesc.getFirstChild().getNodeValue();
 
-                                        image.setPlatform(Platform.guess(desc));
+                                        platform = Platform.guess(desc);
 
                                         if( desc.contains("32") || (desc.contains("x86") && !desc.contains("64")) ) {
-                                            image.setArchitecture(Architecture.I32);
+                                            architecture = Architecture.I32;
                                         }
                                     }
                                 }
@@ -724,26 +714,19 @@ public class TemplateSupport extends AbstractImageSupport {
                 }
             }
             else if( attribute.getNodeName().equalsIgnoreCase("datecreated") && attribute.hasChildNodes() ) {
-                image.setCreationTimestamp(((vCloud)getProvider()).parseTime(attribute.getFirstChild().getNodeValue().trim()));
+                createdAt = ((vCloud)getProvider()).parseTime(attribute.getFirstChild().getNodeValue().trim());
             }
         }
-        if( image.getName() == null ) {
-            image.setName(image.getProviderMachineImageId());
+        if( name == null ) {
+            name = imageId;
         }
-        if( image.getDescription() == null ) {
-            image.setDescription(image.getName());
+        if( description == null ) {
+            description = name;
         }
-        Platform p = image.getPlatform();
-
-        if( p == null || p.equals(Platform.UNKNOWN) ) {
-            image.setPlatform(Platform.guess(image.getName() + " " + image.getDescription()));
+        if( platform.equals(Platform.UNKNOWN) ) {
+            platform = Platform.guess(name + " " + description);
         }
-        image.setArchitecture(Architecture.I64);
-        image.setProviderRegionId(getContext().getRegionId());
-        image.setSoftware("");
-        image.setType(MachineImageType.VOLUME);
-        image.setCurrentState(MachineImageState.ACTIVE);
-        image.setImageClass(ImageClass.MACHINE);
+        MachineImage image = MachineImage.getMachineImageInstance(ownerId, getContext().getRegionId(), imageId, MachineImageState.ACTIVE, name, description, architecture, platform).createdAt(createdAt);
         StringBuilder ids = new StringBuilder();
 
         for( String id : childVms ) {
@@ -805,10 +788,9 @@ public class TemplateSupport extends AbstractImageSupport {
                                         Node href = item.getAttributes().getNamedItem("href");
 
                                         if( href != null ) {
-                                            MachineImage image = loadTemplate(((vCloud)getProvider()).toID(href.getNodeValue().trim()));
+                                            MachineImage image = loadTemplate(catalog.owner, ((vCloud)getProvider()).toID(href.getNodeValue().trim()));
 
                                             if( image != null ) {
-                                                image.setProviderOwnerId(catalog.owner);
                                                 if( options == null || options.matches(image) ) {
                                                     images.add(image);
                                                 }
