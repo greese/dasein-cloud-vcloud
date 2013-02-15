@@ -157,33 +157,6 @@ public class vCloud extends AbstractCloud {
         }
     }
 
-
-    public @Nonnull String getVMProductsResource() {
-        ProviderContext ctx = getContext();
-        String value;
-
-        if( ctx == null ) {
-            value = null;
-        }
-        else {
-            Properties p = ctx.getCustomProperties();
-
-            if( p == null ) {
-                value = null;
-            }
-            else {
-                value = p.getProperty("vmproducts");
-            }
-        }
-        if( value == null ) {
-            value = System.getProperty("vcloud.vmproducts");
-        }
-        if( value == null ) {
-            value = "/org/dasein/cloud/vcloud/vmproducts.json";
-        }
-        return value;
-    }
-
     public boolean isCompat() {
         ProviderContext ctx = getContext();
         String value;
