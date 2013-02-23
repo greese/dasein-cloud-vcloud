@@ -67,6 +67,9 @@ public class DiskSupport extends AbstractVolumeSupport {
         }
         APITrace.begin(getProvider(), "Volume.createVolume");
         try {
+            if( !isSubscribed() ) {
+                throw new OperationNotSupportedException("This account is not subscribed for creating volume");
+            }
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             String vdcId = options.getDataCenterId();
 

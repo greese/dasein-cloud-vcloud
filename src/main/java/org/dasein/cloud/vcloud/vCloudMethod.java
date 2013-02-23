@@ -39,6 +39,7 @@ import org.apache.http.conn.ssl.TrustStrategy;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.CoreConnectionPNames;
 import org.apache.http.params.HttpParams;
 import org.apache.http.params.HttpProtocolParams;
 import org.apache.http.protocol.HTTP;
@@ -218,19 +219,20 @@ public class vCloudMethod {
     }
 
     private void loadOrg(@Nonnull String endpoint, @Nonnull Org org, @Nonnull String orgId) throws CloudException, InternalException {
-        String xml;
+        HttpClient client = getClient(false);
+        HttpGet get = new HttpGet(endpoint);
+
+        get.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
+        addAuth(get, org.token);
 
         if( wire.isDebugEnabled() ) {
             wire.debug("");
             wire.debug(">>> [GET (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
         }
+        HttpResponse response;
+        String xml = null;
+
         try {
-            HttpClient client = getClient(false);
-            HttpGet get = new HttpGet(endpoint);
-
-            get.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-            addAuth(get, org.token);
-
             if( wire.isDebugEnabled() ) {
                 wire.debug(get.getRequestLine().toString());
                 for( Header header : get.getAllHeaders() ) {
@@ -238,7 +240,6 @@ public class vCloudMethod {
                 }
                 wire.debug("");
             }
-            HttpResponse response;
 
             try {
                 APITrace.trace(provider, "GET org");
@@ -256,78 +257,24 @@ public class vCloudMethod {
                 e.printStackTrace();
                 throw new InternalException(e);
             }
-            int code = response.getStatusLine().getStatusCode();
+            try {
+                HttpEntity entity = response.getEntity();
 
-            logger.debug("HTTP STATUS: " + code);
-
-            if( code == HttpServletResponse.SC_NOT_FOUND || code == HttpServletResponse.SC_FORBIDDEN ) {
-                throw new CloudException("Org URL is invalid");
-            }
-            else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
-                authenticate(true);
-                loadOrg(endpoint, org, orgId);
-                return;
-            }
-            else if( code == HttpServletResponse.SC_NO_CONTENT ) {
-                throw new CloudException("No content from org URL");
-            }
-            else if( code == HttpServletResponse.SC_OK ) {
-                try {
-                    HttpEntity entity = response.getEntity();
-
-                    if( entity != null ) {
-                        xml = EntityUtils.toString(entity);
-                        if( wire.isDebugEnabled() ) {
-                            wire.debug(xml);
-                            wire.debug("");
-                        }
-                    }
-                    else {
-                        xml = null;
+                if( entity != null ) {
+                    xml = EntityUtils.toString(entity);
+                    if( wire.isDebugEnabled() ) {
+                        wire.debug(xml);
+                        wire.debug("");
                     }
                 }
-                catch( IOException e ) {
-                    logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    e.printStackTrace();
-                    throw new CloudException(e);
+                else {
+                    xml = null;
                 }
             }
-            else {
-                logger.error("Expected OK for GET request, got " + code);
-                try {
-                    HttpEntity entity = response.getEntity();
-
-                    if( entity != null ) {
-                        xml = EntityUtils.toString(entity);
-                        if( wire.isDebugEnabled() ) {
-                            wire.debug(xml);
-                            wire.debug("");
-                        }
-                    }
-                    else {
-                        xml = null;
-                    }
-                }
-                catch( IOException e ) {
-                    logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    e.printStackTrace();
-                    throw new CloudException(e);
-                }
-
-                vCloudException.Data data = null;
-
-                if( xml != null && !xml.equals("") ) {
-                    NodeList errors = parseXML(xml).getElementsByTagName("Error");
-
-                    if( errors.getLength() > 0 ) {
-                        data = vCloudException.parseException(code, errors.item(0));
-                    }
-                }
-                if( data == null ) {
-                    throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
-                }
-                logger.error("[" +  code + " : " + data.title + "] " + data.description);
-                throw new vCloudException(data);
+            catch( IOException e ) {
+                logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
+                e.printStackTrace();
+                throw new CloudException(e);
             }
         }
         finally {
@@ -336,6 +283,39 @@ public class vCloudMethod {
                 wire.debug("");
             }
         }
+        int code = response.getStatusLine().getStatusCode();
+
+        logger.debug("HTTP STATUS: " + code);
+
+        if( code == HttpServletResponse.SC_NOT_FOUND || code == HttpServletResponse.SC_FORBIDDEN ) {
+            throw new CloudException("Org URL is invalid");
+        }
+        else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
+            authenticate(true);
+            loadOrg(endpoint, org, orgId);
+            return;
+        }
+        else if( code == HttpServletResponse.SC_NO_CONTENT ) {
+            throw new CloudException("No content from org URL");
+        }
+        else if( code != HttpServletResponse.SC_OK ) {
+            logger.error("Expected OK for GET request, got " + code);
+            vCloudException.Data data = null;
+
+            if( xml != null && !xml.equals("") ) {
+                NodeList errors = parseXML(xml).getElementsByTagName("Error");
+
+                if( errors.getLength() > 0 ) {
+                    data = vCloudException.parseException(code, errors.item(0));
+                }
+            }
+            if( data == null ) {
+                throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+            }
+            logger.error("[" +  code + " : " + data.title + "] " + data.description);
+            throw new vCloudException(data);
+        }
+
         if( xml == null ) {
             throw new CloudException("No content from org URL");
         }
@@ -393,19 +373,22 @@ public class vCloudMethod {
 
         if( it == null || !it.hasNext() ) {
             String endpoint = getVersion().loginUrl;
+            HttpClient client = getClient(true);
+            HttpPost method =  new HttpPost(endpoint);
+            Org org = new Org();
+
+            org.version = getVersion();
+            method.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
 
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug(">>> [POST (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
             }
+            HttpResponse response;
+            StatusLine status;
+            String body = null;
+
             try {
-                HttpClient client = getClient(true);
-                HttpPost method =  new HttpPost(endpoint);
-                Org org = new Org();
-
-                org.version = getVersion();
-                method.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-
                 if( wire.isDebugEnabled() ) {
                     wire.debug(method.getRequestLine().toString());
                     for( Header header : method.getAllHeaders() ) {
@@ -413,8 +396,6 @@ public class vCloudMethod {
                     }
                     wire.debug("");
                 }
-                HttpResponse response;
-                StatusLine status;
 
                 try {
                     APITrace.trace(provider, "POST sessions");
@@ -431,190 +412,18 @@ public class vCloudMethod {
                 catch( IOException e ) {
                     throw new CloudException(e);
                 }
-                if( status.getStatusCode() == HttpServletResponse.SC_OK ) {
-                    if( matches(getAPIVersion(), "0.8", "0.8") ) {
-                        for( Header h : response.getHeaders("Set-Cookie") ) {
-                            String value = h.getValue();
+                HttpEntity entity = response.getEntity();
 
-                            if( value != null ) {
-                                value = value.trim();
-                                if( value.startsWith("vcloud-token") ) {
-                                    value = value.substring("vcloud-token=".length());
-
-                                    int idx = value.indexOf(";");
-
-                                    if( idx == -1 ) {
-                                        org.token = value;
-                                    }
-                                    else {
-                                        org.token = value.substring(0, idx);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    else {
-                        org.token = response.getFirstHeader("x-vcloud-authorization").getValue();
-                    }
-                    if( org.token == null ) {
-                        throw new CloudException(CloudErrorType.AUTHENTICATION, 200, "Token Empty", "No token was provided");
-                    }
-                    HttpEntity entity = response.getEntity();
-                    String body;
-
-                    try {
-                        body = EntityUtils.toString(entity);
-                        if( wire.isDebugEnabled() ) {
-                            wire.debug(body);
-                            wire.debug("");
-                        }
-                    }
-                    catch( IOException e ) {
-                        throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
-                    }
-                    try {
-                        ByteArrayInputStream bas = new ByteArrayInputStream(body.getBytes());
-
-                        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-                        DocumentBuilder parser = factory.newDocumentBuilder();
-                        Document doc = parser.parse(bas);
-
-                        bas.close();
-                        if( matches(org.version.version, "1.5", null) ) {
-                            NodeList orgNodes = doc.getElementsByTagName("Link");
-                            String orgList = null;
-
-                            for( int i=0; i<orgNodes.getLength(); i++ ) {
-                                Node orgNode = orgNodes.item(i);
-
-                                if( orgNode.hasAttributes() ) {
-                                    Node type = orgNode.getAttributes().getNamedItem("type");
-
-                                    if( type != null && type.getNodeValue().trim().equals(getMediaTypeForOrg()) ) {
-                                        Node name = orgNode.getAttributes().getNamedItem("name");
-
-                                        if( name != null && name.getNodeValue().trim().equals(accountNumber) ) {
-                                            Node href = orgNode.getAttributes().getNamedItem("href");
-
-                                            if( href != null ) {
-                                                Region region = new Region();
-                                                String url = href.getNodeValue().trim();
-
-                                                region.setActive(true);
-                                                region.setAvailable(true);
-                                                if( provider.isCompat() ) {
-                                                    region.setProviderRegionId("/org/" + url.substring(url.lastIndexOf('/') + 1));
-                                                }
-                                                else {
-                                                    region.setProviderRegionId(url.substring(url.lastIndexOf('/') + 1));
-                                                }
-                                                region.setJurisdiction("US");
-                                                region.setName(name.getNodeValue().trim());
-
-                                                org.endpoint = url.substring(0, url.lastIndexOf("/api/org"));
-                                                org.region = region;
-                                                org.url = url;
-                                            }
-                                        }
-                                    }
-                                    if( type != null && type.getNodeValue().trim().equals(getMediaTypeForOrgList()) ) {
-                                        Node href = orgNode.getAttributes().getNamedItem("href");
-
-                                        if( href != null ) {
-                                            orgList = href.getNodeValue().trim();
-                                        }
-                                    }
-                                }
-                            }
-                            if( org.endpoint == null && orgList != null ) {
-                                loadOrg(orgList, org, accountNumber);
-                            }
-                        }
-                        else {
-                            NodeList orgNodes = doc.getElementsByTagName("Org");
-
-                            for( int i=0; i<orgNodes.getLength(); i++ ) {
-                                Node orgNode = orgNodes.item(i);
-
-                                if( orgNode.hasAttributes() ) {
-                                    Node name = orgNode.getAttributes().getNamedItem("name");
-                                    Node href = orgNode.getAttributes().getNamedItem("href");
-
-                                    if( href != null ) {
-                                        String url = href.getNodeValue().trim();
-                                        Region region = new Region();
-
-                                        if( !url.endsWith("/org/" + accountNumber) ) {
-                                            continue;
-                                        }
-                                        region.setActive(true);
-                                        region.setAvailable(true);
-                                        if( provider.isCompat() ) {
-                                            region.setProviderRegionId("/org/" + url.substring(url.lastIndexOf('/') + 1));
-                                        }
-                                        else {
-                                            region.setProviderRegionId(url.substring(url.lastIndexOf('/') + 1));
-                                        }
-                                        region.setJurisdiction("US");
-                                        region.setName(name == null ? accountNumber : name.getNodeValue().trim());
-                                        org.endpoint = url.substring(0, url.lastIndexOf("/org/"));
-                                        org.region = region;
-                                        org.url = url;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    catch( IOException e ) {
-                        throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
-                    }
-                    catch( ParserConfigurationException e ) {
-                        throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
-                    }
-                    catch( SAXException e ) {
-                        throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                try {
+                    body = EntityUtils.toString(entity);
+                    if( wire.isDebugEnabled() ) {
+                        wire.debug(body);
+                        wire.debug("");
                     }
                 }
-                else {
-                    HttpEntity entity = response.getEntity();
-
-                    if( entity != null ) {
-                        String body;
-
-                        try {
-                            body = EntityUtils.toString(entity);
-                            if( wire.isDebugEnabled() ) {
-                                wire.debug(body);
-                                wire.debug("");
-                            }
-                        }
-                        catch( IOException e ) {
-                            throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
-                        }
-                        vCloudException.Data data = null;
-
-                        if( body != null && !body.equals("") ) {
-                            NodeList errors = parseXML(body).getElementsByTagName("Error");
-
-                            if( errors.getLength() > 0 ) {
-                                data = vCloudException.parseException(status.getStatusCode(), errors.item(0));
-                            }
-                        }
-                        if( data == null ) {
-                            logger.error("Received an error from " + provider.getCloudName() + " with no data: " + status.getStatusCode() + "/" + response.getStatusLine().getReasonPhrase());
-                            throw new vCloudException(CloudErrorType.GENERAL, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
-                        }
-                        logger.error("[" +  status.getStatusCode() + " : " + data.title + "] " + data.description);
-                        throw new vCloudException(data);
-                    }
-                    throw new CloudException(CloudErrorType.AUTHENTICATION, status.getStatusCode(), status.getReasonPhrase(), "Authentication failed");
+                catch( IOException e ) {
+                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
                 }
-                if( org.endpoint == null ) {
-                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), "No Org", "No org was identified for " + ctx.getAccountNumber());
-                }
-                cache.put(ctx, Collections.singletonList(org));
-                loadVDCs(org);
-                return org;
             }
             finally {
                 if( wire.isDebugEnabled() ) {
@@ -622,6 +431,166 @@ public class vCloudMethod {
                     wire.debug("");
                 }
             }
+            if( status.getStatusCode() == HttpServletResponse.SC_OK ) {
+                if( matches(getAPIVersion(), "0.8", "0.8") ) {
+                    for( Header h : response.getHeaders("Set-Cookie") ) {
+                        String value = h.getValue();
+
+                        if( value != null ) {
+                            value = value.trim();
+                            if( value.startsWith("vcloud-token") ) {
+                                value = value.substring("vcloud-token=".length());
+
+                                int idx = value.indexOf(";");
+
+                                if( idx == -1 ) {
+                                    org.token = value;
+                                }
+                                else {
+                                    org.token = value.substring(0, idx);
+                                }
+                            }
+                        }
+                    }
+                }
+                else {
+                    org.token = response.getFirstHeader("x-vcloud-authorization").getValue();
+                }
+                if( org.token == null ) {
+                    throw new CloudException(CloudErrorType.AUTHENTICATION, 200, "Token Empty", "No token was provided");
+                }
+                try {
+                    ByteArrayInputStream bas = new ByteArrayInputStream(body.getBytes());
+
+                    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+                    DocumentBuilder parser = factory.newDocumentBuilder();
+                    Document doc = parser.parse(bas);
+
+                    bas.close();
+                    if( matches(org.version.version, "1.5", null) ) {
+                        NodeList orgNodes = doc.getElementsByTagName("Link");
+                        String orgList = null;
+
+                        for( int i=0; i<orgNodes.getLength(); i++ ) {
+                            Node orgNode = orgNodes.item(i);
+
+                            if( orgNode.hasAttributes() ) {
+                                Node type = orgNode.getAttributes().getNamedItem("type");
+
+                                if( type != null && type.getNodeValue().trim().equals(getMediaTypeForOrg()) ) {
+                                    Node name = orgNode.getAttributes().getNamedItem("name");
+
+                                    if( name != null && name.getNodeValue().trim().equals(accountNumber) ) {
+                                        Node href = orgNode.getAttributes().getNamedItem("href");
+
+                                        if( href != null ) {
+                                            Region region = new Region();
+                                            String url = href.getNodeValue().trim();
+
+                                            region.setActive(true);
+                                            region.setAvailable(true);
+                                            if( provider.isCompat() ) {
+                                                region.setProviderRegionId("/org/" + url.substring(url.lastIndexOf('/') + 1));
+                                            }
+                                            else {
+                                                region.setProviderRegionId(url.substring(url.lastIndexOf('/') + 1));
+                                            }
+                                            region.setJurisdiction("US");
+                                            region.setName(name.getNodeValue().trim());
+
+                                            org.endpoint = url.substring(0, url.lastIndexOf("/api/org"));
+                                            org.region = region;
+                                            org.url = url;
+                                        }
+                                    }
+                                }
+                                if( type != null && type.getNodeValue().trim().equals(getMediaTypeForOrgList()) ) {
+                                    Node href = orgNode.getAttributes().getNamedItem("href");
+
+                                    if( href != null ) {
+                                        orgList = href.getNodeValue().trim();
+                                    }
+                                }
+                            }
+                        }
+                        if( org.endpoint == null && orgList != null ) {
+                            loadOrg(orgList, org, accountNumber);
+                        }
+                    }
+                    else {
+                        NodeList orgNodes = doc.getElementsByTagName("Org");
+
+                        for( int i=0; i<orgNodes.getLength(); i++ ) {
+                            Node orgNode = orgNodes.item(i);
+
+                            if( orgNode.hasAttributes() ) {
+                                Node name = orgNode.getAttributes().getNamedItem("name");
+                                Node href = orgNode.getAttributes().getNamedItem("href");
+
+                                if( href != null ) {
+                                    String url = href.getNodeValue().trim();
+                                    Region region = new Region();
+
+                                    if( !url.endsWith("/org/" + accountNumber) ) {
+                                        continue;
+                                    }
+                                    region.setActive(true);
+                                    region.setAvailable(true);
+                                    if( provider.isCompat() ) {
+                                        region.setProviderRegionId("/org/" + url.substring(url.lastIndexOf('/') + 1));
+                                    }
+                                    else {
+                                        region.setProviderRegionId(url.substring(url.lastIndexOf('/') + 1));
+                                    }
+                                    region.setJurisdiction("US");
+                                    region.setName(name == null ? accountNumber : name.getNodeValue().trim());
+                                    org.endpoint = url.substring(0, url.lastIndexOf("/org/"));
+                                    org.region = region;
+                                    org.url = url;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch( IOException e ) {
+                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                }
+                catch( ParserConfigurationException e ) {
+                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                }
+                catch( SAXException e ) {
+                    throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
+                }
+            }
+            else {
+                HttpEntity entity = response.getEntity();
+
+                if( entity != null ) {
+                    vCloudException.Data data = null;
+
+                    if( body != null && !body.equals("") ) {
+                        NodeList errors = parseXML(body).getElementsByTagName("Error");
+
+                        if( errors.getLength() > 0 ) {
+                            data = vCloudException.parseException(status.getStatusCode(), errors.item(0));
+                        }
+                    }
+                    if( data == null ) {
+                        logger.error("Received an error from " + provider.getCloudName() + " with no data: " + status.getStatusCode() + "/" + response.getStatusLine().getReasonPhrase());
+                        throw new vCloudException(CloudErrorType.GENERAL, status.getStatusCode(), response.getStatusLine().getReasonPhrase(), "No further information");
+                    }
+                    logger.error("[" +  status.getStatusCode() + " : " + data.title + "] " + data.description);
+                    throw new vCloudException(data);
+                }
+                throw new CloudException(CloudErrorType.AUTHENTICATION, status.getStatusCode(), status.getReasonPhrase(), "Authentication failed");
+            }
+            if( org.endpoint == null ) {
+                throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), "No Org", "No org was identified for " + ctx.getAccountNumber());
+            }
+            cache.put(ctx, Collections.singletonList(org));
+            loadVDCs(org);
+            return org;
+
         }
         else {
             return it.next();
@@ -646,18 +615,20 @@ public class vCloudMethod {
         try {
             Org org = authenticate(false);
             String endpoint = toURL(resource, id);
+            HttpClient client = getClient(false);
+            HttpDelete delete = new HttpDelete(endpoint);
+
+            delete.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
+            addAuth(delete, org.token);
 
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug(">>> [DELETE (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
             }
+            HttpResponse response;
+            String xml = null;
+
             try {
-                HttpClient client = getClient(false);
-                HttpDelete delete = new HttpDelete(endpoint);
-
-                delete.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-                addAuth(delete, org.token);
-
                 if( wire.isDebugEnabled() ) {
                     wire.debug(delete.getRequestLine().toString());
                     for( Header header : delete.getAllHeaders() ) {
@@ -665,7 +636,6 @@ public class vCloudMethod {
                     }
                     wire.debug("");
                 }
-                HttpResponse response;
 
                 try {
                     APITrace.trace(provider, "DELETE " + resource);
@@ -677,24 +647,6 @@ public class vCloudMethod {
                         }
                         wire.debug("");
                     }
-                }
-                catch( IOException e ) {
-                    logger.error("I/O error from server communications: " + e.getMessage());
-                    e.printStackTrace();
-                    throw new InternalException(e);
-                }
-                int code = response.getStatusLine().getStatusCode();
-
-                logger.debug("HTTP STATUS: " + code);
-
-                if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
-                    authenticate(true);
-                    return delete(resource, id);
-                }
-                else if( code != HttpServletResponse.SC_NOT_FOUND && code != HttpServletResponse.SC_NO_CONTENT && code != HttpServletResponse.SC_OK && code != HttpServletResponse.SC_ACCEPTED ) {
-                    logger.error("DELETE request got unexpected " + code);
-                    String xml = null;
-
                     try {
                         HttpEntity entity = response.getEntity();
 
@@ -711,7 +663,23 @@ public class vCloudMethod {
                         e.printStackTrace();
                         throw new CloudException(e);
                     }
+                }
+                finally {
+                    if( wire.isDebugEnabled() ) {
+                        wire.debug("<<< [DELETE (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
+                        wire.debug("");
+                    }
+                }
+                int code = response.getStatusLine().getStatusCode();
 
+                logger.debug("HTTP STATUS: " + code);
+
+                if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
+                    authenticate(true);
+                    return delete(resource, id);
+                }
+                else if( code != HttpServletResponse.SC_NOT_FOUND && code != HttpServletResponse.SC_NO_CONTENT && code != HttpServletResponse.SC_OK && code != HttpServletResponse.SC_ACCEPTED ) {
+                    logger.error("DELETE request got unexpected " + code);
                     vCloudException.Data data = null;
 
                     if( xml != null && !xml.equals("") ) {
@@ -728,32 +696,13 @@ public class vCloudMethod {
                     throw new vCloudException(data);
                 }
                 else {
-                    String xml = null;
-
-                    try {
-                        HttpEntity entity = response.getEntity();
-
-                        if( entity != null ) {
-                            xml = EntityUtils.toString(entity);
-                            if( wire.isDebugEnabled() ) {
-                                wire.debug(xml);
-                                wire.debug("");
-                            }
-                        }
-                    }
-                    catch( IOException e ) {
-                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
-                        throw new CloudException(e);
-                    }
                     return xml;
                 }
             }
-            finally {
-                if( wire.isDebugEnabled() ) {
-                    wire.debug("<<< [DELETE (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
-                    wire.debug("");
-                }
+            catch( IOException e ) {
+                logger.error("I/O error from server communications: " + e.getMessage());
+                e.printStackTrace();
+                throw new InternalException(e);
             }
         }
         finally {
@@ -772,18 +721,22 @@ public class vCloudMethod {
             Org org = authenticate(false);
             String endpoint = toURL(resource, id);
 
+
+            HttpClient client = getClient(false);
+            HttpGet get = new HttpGet(endpoint);
+
+            get.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
+
+            addAuth(get, org.token);
+
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug(">>> [GET (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
             }
+            HttpResponse response;
+            String xml = null;
+
             try {
-                HttpClient client = getClient(false);
-                HttpGet get = new HttpGet(endpoint);
-
-                get.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-
-                addAuth(get, org.token);
-
                 if( wire.isDebugEnabled() ) {
                     wire.debug(get.getRequestLine().toString());
                     for( Header header : get.getAllHeaders() ) {
@@ -791,8 +744,6 @@ public class vCloudMethod {
                     }
                     wire.debug("");
                 }
-                HttpResponse response;
-
                 try {
                     APITrace.trace(provider, "GET " + resource);
                     response = client.execute(get);
@@ -803,85 +754,27 @@ public class vCloudMethod {
                         }
                         wire.debug("");
                     }
+                    try {
+                        HttpEntity entity = response.getEntity();
+
+                        if( entity != null ) {
+                            xml = EntityUtils.toString(entity);
+                            if( wire.isDebugEnabled() ) {
+                                wire.debug(xml);
+                                wire.debug("");
+                            }
+                        }
+                    }
+                    catch( IOException e ) {
+                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
+                        e.printStackTrace();
+                        throw new CloudException(e);
+                    }
                 }
                 catch( IOException e ) {
                     logger.error("I/O error from server communications: " + e.getMessage());
                     e.printStackTrace();
                     throw new InternalException(e);
-                }
-                int code = response.getStatusLine().getStatusCode();
-
-                logger.debug("HTTP STATUS: " + code);
-
-                if( code == HttpServletResponse.SC_NOT_FOUND || code == HttpServletResponse.SC_FORBIDDEN ) {
-                    return null;
-                }
-                else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
-                    if( matches(getAPIVersion(), "1.0", null) ) {
-                        authenticate(true);
-                        return get(resource, id);
-                    }
-                    return null;
-                }
-                else if( code == HttpServletResponse.SC_NO_CONTENT ) {
-                    return "";
-                }
-                else if( code == HttpServletResponse.SC_OK ) {
-                    String xml = null;
-
-                    try {
-                        HttpEntity entity = response.getEntity();
-
-                        if( entity != null ) {
-                            xml = EntityUtils.toString(entity);
-                            if( wire.isDebugEnabled() ) {
-                                wire.debug(xml);
-                                wire.debug("");
-                            }
-                        }
-                    }
-                    catch( IOException e ) {
-                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
-                        throw new CloudException(e);
-                    }
-                    return xml;
-                }
-                else {
-                    logger.error("Expected OK for GET request, got " + code);
-                    String xml = null;
-
-                    try {
-                        HttpEntity entity = response.getEntity();
-
-                        if( entity != null ) {
-                            xml = EntityUtils.toString(entity);
-                            if( wire.isDebugEnabled() ) {
-                                wire.debug(xml);
-                                wire.debug("");
-                            }
-                        }
-                    }
-                    catch( IOException e ) {
-                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
-                        throw new CloudException(e);
-                    }
-
-                    vCloudException.Data data = null;
-
-                    if( xml != null && !xml.equals("") ) {
-                        NodeList errors = parseXML(xml).getElementsByTagName("Error");
-
-                        if( errors.getLength() > 0 ) {
-                            data = vCloudException.parseException(code, errors.item(0));
-                        }
-                    }
-                    if( data == null ) {
-                        throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
-                    }
-                    logger.error("[" +  code + " : " + data.title + "] " + data.description);
-                    throw new vCloudException(data);
                 }
             }
             finally {
@@ -889,6 +782,43 @@ public class vCloudMethod {
                     wire.debug("<<< [GET (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
                     wire.debug("");
                 }
+            }
+            int code = response.getStatusLine().getStatusCode();
+
+            logger.debug("HTTP STATUS: " + code);
+
+            if( code == HttpServletResponse.SC_NOT_FOUND || code == HttpServletResponse.SC_FORBIDDEN ) {
+                return null;
+            }
+            else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
+                if( matches(getAPIVersion(), "1.0", null) ) {
+                    authenticate(true);
+                    return get(resource, id);
+                }
+                return null;
+            }
+            else if( code == HttpServletResponse.SC_NO_CONTENT ) {
+                return "";
+            }
+            else if( code == HttpServletResponse.SC_OK ) {
+                return xml;
+            }
+            else {
+                logger.error("Expected OK for GET request, got " + code);
+                vCloudException.Data data = null;
+
+                if( xml != null && !xml.equals("") ) {
+                    NodeList errors = parseXML(xml).getElementsByTagName("Error");
+
+                    if( errors.getLength() > 0 ) {
+                        data = vCloudException.parseException(code, errors.item(0));
+                    }
+                }
+                if( data == null ) {
+                    throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+                }
+                logger.error("[" +  code + " : " + data.title + "] " + data.description);
+                throw new vCloudException(data);
             }
         }
         finally {
@@ -941,6 +871,9 @@ public class vCloudMethod {
         //noinspection deprecation
         HttpProtocolParams.setContentCharset(params, HTTP.UTF_8);
         HttpProtocolParams.setUserAgent(params, "");
+
+        params.setParameter(CoreConnectionPNames.CONNECTION_TIMEOUT, 10000);
+        params.setParameter(CoreConnectionPNames.SO_TIMEOUT, 300000);
 
         Properties p = ctx.getCustomProperties();
 
@@ -1703,22 +1636,26 @@ public class vCloudMethod {
             logger.trace("ENTER: " + vCloudMethod.class.getName() + ".post(" + endpoint + ")");
         }
         try {
+            Org org = authenticate(false);
+            HttpClient client = getClient(false);
+            HttpPost post = new HttpPost(endpoint);
+
+            post.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
+            addAuth(post, org.token);
+
+            if( contentType != null ) {
+                post.addHeader("Content-Type", contentType);
+            }
+
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug(">>> [POST (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
             }
+
+            HttpResponse response;
+            String xml = null;
+
             try {
-                Org org = authenticate(false);
-                HttpClient client = getClient(false);
-                HttpPost post = new HttpPost(endpoint);
-
-                post.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-                addAuth(post, org.token);
-
-                if( contentType != null ) {
-                    post.addHeader("Content-Type", contentType);
-                }
-
                 if( wire.isDebugEnabled() ) {
                     wire.debug(post.getRequestLine().toString());
                     for( Header header : post.getAllHeaders() ) {
@@ -1739,7 +1676,6 @@ public class vCloudMethod {
 
                     wire.debug("");
                 }
-                HttpResponse response;
 
                 try {
                     APITrace.trace(provider, "POST " + action);
@@ -1757,76 +1693,21 @@ public class vCloudMethod {
                     e.printStackTrace();
                     throw new InternalException(e);
                 }
-                int code = response.getStatusLine().getStatusCode();
+                try {
+                    HttpEntity entity = response.getEntity();
 
-                logger.debug("HTTP STATUS: " + code);
-
-                if( code == HttpServletResponse.SC_NOT_FOUND ) {
-                    throw new CloudException("No action match for " + endpoint);
-                }
-                else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
-                    authenticate(true);
-                    return post(action, endpoint, contentType, payload);
-                }
-                else if( code == HttpServletResponse.SC_NO_CONTENT ) {
-                    return "";
-                }
-                else if( code == HttpServletResponse.SC_OK || code == HttpServletResponse.SC_CREATED || code == HttpServletResponse.SC_ACCEPTED ) {
-                    String xml = null;
-
-                    try {
-                        HttpEntity entity = response.getEntity();
-
-                        if( entity != null ) {
-                            xml = EntityUtils.toString(entity);
-                            if( wire.isDebugEnabled() ) {
-                                wire.debug(xml);
-                                wire.debug("");
-                            }
+                    if( entity != null ) {
+                        xml = EntityUtils.toString(entity);
+                        if( wire.isDebugEnabled() ) {
+                            wire.debug(xml);
+                            wire.debug("");
                         }
                     }
-                    catch( IOException e ) {
-                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
-                        throw new CloudException(e);
-                    }
-                    return xml;
                 }
-                else {
-                    logger.error("Expected OK or CREATED or NO_CONTENT or ACCEPTED for POST request, got " + code);
-                    String xml = null;
-
-                    try {
-                        HttpEntity entity = response.getEntity();
-
-                        if( entity != null ) {
-                            xml = EntityUtils.toString(entity);
-                            if( wire.isDebugEnabled() ) {
-                                wire.debug(xml);
-                                wire.debug("");
-                            }
-                        }
-                    }
-                    catch( IOException e ) {
-                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
-                        throw new CloudException(e);
-                    }
-
-                    vCloudException.Data data = null;
-
-                    if( xml != null && !xml.equals("") ) {
-                        NodeList errors = parseXML(xml).getElementsByTagName("Error");
-
-                        if( errors.getLength() > 0 ) {
-                            data = vCloudException.parseException(code, errors.item(0));
-                        }
-                    }
-                    if( data == null ) {
-                        throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
-                    }
-                    logger.error("[" +  code + " : " + data.title + "] " + data.description);
-                    throw new vCloudException(data);
+                catch( IOException e ) {
+                    logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
+                    e.printStackTrace();
+                    throw new CloudException(e);
                 }
             }
             finally {
@@ -1834,6 +1715,40 @@ public class vCloudMethod {
                     wire.debug("<<< [POST (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
                     wire.debug("");
                 }
+            }
+            int code = response.getStatusLine().getStatusCode();
+
+            logger.debug("HTTP STATUS: " + code);
+
+            if( code == HttpServletResponse.SC_NOT_FOUND ) {
+                throw new CloudException("No action match for " + endpoint);
+            }
+            else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
+                authenticate(true);
+                return post(action, endpoint, contentType, payload);
+            }
+            else if( code == HttpServletResponse.SC_NO_CONTENT ) {
+                return "";
+            }
+            else if( code == HttpServletResponse.SC_OK || code == HttpServletResponse.SC_CREATED || code == HttpServletResponse.SC_ACCEPTED ) {
+                return xml;
+            }
+            else {
+                logger.error("Expected OK or CREATED or NO_CONTENT or ACCEPTED for POST request, got " + code);
+                vCloudException.Data data = null;
+
+                if( xml != null && !xml.equals("") ) {
+                    NodeList errors = parseXML(xml).getElementsByTagName("Error");
+
+                    if( errors.getLength() > 0 ) {
+                        data = vCloudException.parseException(code, errors.item(0));
+                    }
+                }
+                if( data == null ) {
+                    throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+                }
+                logger.error("[" +  code + " : " + data.title + "] " + data.description);
+                throw new vCloudException(data);
             }
         }
         finally {
@@ -1874,23 +1789,27 @@ public class vCloudMethod {
             logger.trace("ENTER: " + vCloudMethod.class.getName() + ".put(" + endpoint + ")");
         }
         try {
+
+            Org org = authenticate(false);
+            HttpClient client = getClient(false);
+            HttpPut put = new HttpPut(endpoint);
+
+            put.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
+
+            addAuth(put, org.token);
+
+            if( contentType != null ) {
+                put.addHeader("Content-Type", contentType);
+            }
+
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug(">>> [PUT (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
             }
+            HttpResponse response;
+            String xml = null;
+
             try {
-                Org org = authenticate(false);
-                HttpClient client = getClient(false);
-                HttpPut put = new HttpPut(endpoint);
-
-                put.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
-
-                addAuth(put, org.token);
-
-                if( contentType != null ) {
-                    put.addHeader("Content-Type", contentType);
-                }
-
                 if( wire.isDebugEnabled() ) {
                     wire.debug(put.getRequestLine().toString());
                     for( Header header : put.getAllHeaders() ) {
@@ -1911,7 +1830,6 @@ public class vCloudMethod {
 
                     wire.debug("");
                 }
-                HttpResponse response;
 
                 try {
                     APITrace.trace(provider, "PUT " + action);
@@ -1923,83 +1841,27 @@ public class vCloudMethod {
                         }
                         wire.debug("");
                     }
+                    try {
+                        HttpEntity entity = response.getEntity();
+
+                        if( entity != null ) {
+                            xml = EntityUtils.toString(entity);
+                            if( wire.isDebugEnabled() ) {
+                                wire.debug(xml);
+                                wire.debug("");
+                            }
+                        }
+                    }
+                    catch( IOException e ) {
+                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
+                        e.printStackTrace();
+                        throw new CloudException(e);
+                    }
                 }
                 catch( IOException e ) {
                     logger.error("I/O error from server communications: " + e.getMessage());
                     e.printStackTrace();
                     throw new InternalException(e);
-                }
-                int code = response.getStatusLine().getStatusCode();
-
-                logger.debug("HTTP STATUS: " + code);
-
-                if( code == HttpServletResponse.SC_NOT_FOUND ) {
-                    throw new CloudException("No action match for " + endpoint);
-                }
-                else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
-                    authenticate(true);
-                    return post(action, endpoint, contentType, payload);
-                }
-                else if( code == HttpServletResponse.SC_NO_CONTENT ) {
-                    return "";
-                }
-                else if( code == HttpServletResponse.SC_OK || code == HttpServletResponse.SC_CREATED || code == HttpServletResponse.SC_ACCEPTED ) {
-                    String xml = null;
-
-                    try {
-                        HttpEntity entity = response.getEntity();
-
-                        if( entity != null ) {
-                            xml = EntityUtils.toString(entity);
-                            if( wire.isDebugEnabled() ) {
-                                wire.debug(xml);
-                                wire.debug("");
-                            }
-                        }
-                    }
-                    catch( IOException e ) {
-                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
-                        throw new CloudException(e);
-                    }
-                    return xml;
-                }
-                else {
-                    logger.error("Expected OK or CREATED or NO_CONTENT or ACCEPTED for POST request, got " + code);
-                    String xml = null;
-
-                    try {
-                        HttpEntity entity = response.getEntity();
-
-                        if( entity != null ) {
-                            xml = EntityUtils.toString(entity);
-                            if( wire.isDebugEnabled() ) {
-                                wire.debug(xml);
-                                wire.debug("");
-                            }
-                        }
-                    }
-                    catch( IOException e ) {
-                        logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
-                        throw new CloudException(e);
-                    }
-
-                    vCloudException.Data data = null;
-
-                    if( xml != null && !xml.equals("") ) {
-                        NodeList errors = parseXML(xml).getElementsByTagName("Error");
-
-                        if( errors.getLength() > 0 ) {
-                            data = vCloudException.parseException(code, errors.item(0));
-                        }
-                    }
-                    if( data == null ) {
-                        logger.error("Received an error from " + provider.getCloudName() + " with no data: " + code + "/" + response.getStatusLine().getReasonPhrase());
-                        throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
-                    }
-                    logger.error("[" +  code + " : " + data.title + "] " + data.description);
-                    throw new vCloudException(data);
                 }
             }
             finally {
@@ -2007,6 +1869,42 @@ public class vCloudMethod {
                     wire.debug("<<< [PUT (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
                     wire.debug("");
                 }
+            }
+            int code = response.getStatusLine().getStatusCode();
+
+            logger.debug("HTTP STATUS: " + code);
+
+            if( code == HttpServletResponse.SC_NOT_FOUND ) {
+                throw new CloudException("No action match for " + endpoint);
+            }
+            else if( code == HttpServletResponse.SC_UNAUTHORIZED ) {
+                authenticate(true);
+                return post(action, endpoint, contentType, payload);
+            }
+            else if( code == HttpServletResponse.SC_NO_CONTENT ) {
+                return "";
+            }
+            else if( code == HttpServletResponse.SC_OK || code == HttpServletResponse.SC_CREATED || code == HttpServletResponse.SC_ACCEPTED ) {
+                return xml;
+            }
+            else {
+                logger.error("Expected OK or CREATED or NO_CONTENT or ACCEPTED for POST request, got " + code);
+
+                vCloudException.Data data = null;
+
+                if( xml != null && !xml.equals("") ) {
+                    NodeList errors = parseXML(xml).getElementsByTagName("Error");
+
+                    if( errors.getLength() > 0 ) {
+                        data = vCloudException.parseException(code, errors.item(0));
+                    }
+                }
+                if( data == null ) {
+                    logger.error("Received an error from " + provider.getCloudName() + " with no data: " + code + "/" + response.getStatusLine().getReasonPhrase());
+                    throw new vCloudException(CloudErrorType.GENERAL, code, response.getStatusLine().getReasonPhrase(), "No further information");
+                }
+                logger.error("[" +  code + " : " + data.title + "] " + data.description);
+                throw new vCloudException(data);
             }
         }
         finally {

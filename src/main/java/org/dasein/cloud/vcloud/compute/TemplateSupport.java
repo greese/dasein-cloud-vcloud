@@ -175,7 +175,7 @@ public class TemplateSupport extends AbstractImageSupport {
                 if( imageId == null || imageId.length() < 1 ) {
                     throw new CloudException("No imageId was found in response");
                 }
-                MachineImage img = loadVapp(imageId, getContext().getAccountNumber(), options.getName(), options.getDescription(), System.currentTimeMillis());
+                MachineImage img = loadVapp(imageId, getContext().getAccountNumber(), false, options.getName(), options.getDescription(), System.currentTimeMillis());
 
                 if( img == null ) {
                     throw new CloudException("Image was lost");
@@ -350,9 +350,9 @@ public class TemplateSupport extends AbstractImageSupport {
             if( img == null ) {
                 return false;
             }
-            Boolean p = (Boolean)img.getTag("public");
+            String p = (String)img.getTag("public");
 
-            return (p != null && p);
+            return (p != null && p.equalsIgnoreCase("true"));
         }
         finally {
             APITrace.end();
@@ -495,7 +495,7 @@ public class TemplateSupport extends AbstractImageSupport {
                                                     Node href = item.getAttributes().getNamedItem("href");
 
                                                     if( href != null ) {
-                                                        MachineImage image = loadTemplate(catalog.owner, ((vCloud)getProvider()).toID(href.getNodeValue().trim()));
+                                                        MachineImage image = loadTemplate(catalog.owner, ((vCloud)getProvider()).toID(href.getNodeValue().trim()), catalog.published);
 
                                                         if( image != null ) {
                                                             if( options == null || options.matches(image) ) {
@@ -536,7 +536,7 @@ public class TemplateSupport extends AbstractImageSupport {
         return Collections.emptyList();
     }
 
-    private @Nullable MachineImage loadTemplate(@Nonnull String ownerId, @Nonnull String catalogItemId) throws CloudException, InternalException {
+    private @Nullable MachineImage loadTemplate(@Nonnull String ownerId, @Nonnull String catalogItemId, boolean published) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("catalogItem", catalogItemId);
 
@@ -589,13 +589,13 @@ public class TemplateSupport extends AbstractImageSupport {
                 }
             }
             if( vappId != null ) {
-                return loadVapp(vappId, ownerId, imageName, imageDescription, createdAt);
+                return loadVapp(vappId, ownerId, published, imageName, imageDescription, createdAt);
             }
         }
         return null;
     }
     //imageId, options.getName(), options.getDescription(), System.currentTimeMillis()
-    private @Nullable MachineImage loadVapp(@Nonnull String imageId, @Nonnull String ownerId, @Nullable String name, @Nullable String description, @Nonnegative long createdAt) throws CloudException, InternalException {
+    private @Nullable MachineImage loadVapp(@Nonnull String imageId, @Nonnull String ownerId, boolean published, @Nullable String name, @Nullable String description, @Nonnegative long createdAt) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
         String xml = method.get("vAppTemplate", imageId);
@@ -736,6 +736,9 @@ public class TemplateSupport extends AbstractImageSupport {
             ids.append(id);
         }
         image.setTag("childVirtualMachineIds", ids.toString());
+        if( published ) {
+            image.setTag("public", "true");
+        }
         return image;
     }
 
@@ -788,7 +791,7 @@ public class TemplateSupport extends AbstractImageSupport {
                                         Node href = item.getAttributes().getNamedItem("href");
 
                                         if( href != null ) {
-                                            MachineImage image = loadTemplate(catalog.owner, ((vCloud)getProvider()).toID(href.getNodeValue().trim()));
+                                            MachineImage image = loadTemplate(catalog.owner, ((vCloud)getProvider()).toID(href.getNodeValue().trim()), catalog.published);
 
                                             if( image != null ) {
                                                 if( options == null || options.matches(image) ) {
@@ -819,5 +822,10 @@ public class TemplateSupport extends AbstractImageSupport {
     @Override
     public boolean supportsImageCapture(@Nonnull MachineImageType type) throws CloudException, InternalException {
         return type.equals(MachineImageType.VOLUME);
+    }
+
+    @Override
+    public boolean supportsPublicLibrary(@Nonnull ImageClass cls) {
+        return cls.equals(ImageClass.MACHINE);
     }
 }

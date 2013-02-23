@@ -20,6 +20,7 @@ package org.dasein.cloud.vcloud;
 
 import junit.framework.Test;
 import org.dasein.cloud.test.ComprehensiveTestSuite;
+import org.dasein.cloud.test.GlobalTestSuite;
 import org.dasein.cloud.test.TestConfigurationException;
 
 /**
@@ -28,8 +29,6 @@ import org.dasein.cloud.test.TestConfigurationException;
  *
  * @author George Reese
  */
-public class vCloudTestSuite {
-    static public Test suite() throws TestConfigurationException {
-        return new ComprehensiveTestSuite(vCloud.class);
-    }
+public class TestSuite extends GlobalTestSuite {
+
 }
