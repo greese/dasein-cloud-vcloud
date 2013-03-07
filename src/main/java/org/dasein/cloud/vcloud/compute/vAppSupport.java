@@ -393,7 +393,7 @@ public class vAppSupport extends DefunctVM {
                 xml.append("<AdminPasswordEnabled>true</AdminPasswordEnabled>");
                 if( pw != null ) {
                     xml.append("<AdminPassword>").append(vCloud.escapeXml(pw)).append("</AdminPassword>");
-                    xml.append("<AdminPasswordAuto>false</AdminPasswordAuto>");
+                    //xml.append("<AdminPasswordAuto>false</AdminPasswordAuto>");
                 }
                 else {
                     xml.append("<AdminPasswordAuto>true</AdminPasswordAuto>");
