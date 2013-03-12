@@ -28,7 +28,7 @@ import org.dasein.cloud.test.TestConfigurationException;
  *
  * @author George Reese
  */
-public class vCloudTestSuite {
+public class TestSuite {
     static public Test suite() throws TestConfigurationException {
         return new ComprehensiveTestSuite(vCloud.class);
     }
