@@ -521,6 +521,21 @@ public class vAppSupport extends DefunctVM {
                                         xml.append("</ovf:Item>");
                                         xml.append("</ovf:VirtualHardwareSection>");
                                         method.waitFor(method.put("virtualHardwareSection", vmUrl + "/virtualHardwareSection", method.getMediaTypeForVirtualHardwareSection(), xml.toString()));
+                                        if( vlan != null ) {
+                                            xml = new StringBuilder();
+                                            xml.append("<NetworkConnectionSection href=\"").append(vmUrl).append("/networkConnectionSection/").append("\" ");
+                                            xml.append("xmlns=\"http://www.vmware.com/vcloud/v1.5\" ");
+                                            xml.append(" type=\"").append(method.getMediaTypeForNetworkConnectionSection()).append("\">");
+                                            xml.append("<Info xmlns=\"http://schemas.dmtf.org/ovf/envelope/1\">Specifies the available VM network connections</Info>");
+                                            xml.append("<PrimaryNetworkConnectionIndex>0</PrimaryNetworkConnectionIndex>");
+                                            xml.append("<NetworkConnection network=\"").append(vCloud.escapeXml(vlan.getName())).append("\">");
+                                            xml.append("<NetworkConnectionIndex>0</NetworkConnectionIndex>");
+                                            xml.append("<IsConnected>true</IsConnected>");
+                                            xml.append("<IpAddressAllocationMode>DHCP</IpAddressAllocationMode>");
+                                            xml.append("</NetworkConnection>");
+                                            xml.append("</NetworkConnectionSection>");
+                                            method.waitFor(method.put("networkConnectionSection", vmUrl + "/networkConnectionSection", method.getMediaTypeForNetworkConnectionSection(), xml.toString()));
+                                        }
                                     }
                                     try {
                                         Map<String,Object> metadata = withLaunchOptions.getMetaData();
