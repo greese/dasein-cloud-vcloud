@@ -18,10 +18,7 @@
 
 package org.dasein.cloud.vcloud;
 
-import junit.framework.Test;
-import org.dasein.cloud.test.ComprehensiveTestSuite;
 import org.dasein.cloud.test.GlobalTestSuite;
-import org.dasein.cloud.test.TestConfigurationException;
 
 /**
  * [Class Documentation]

@@ -495,10 +495,12 @@ public class TemplateSupport extends AbstractImageSupport {
                                                     Node href = item.getAttributes().getNamedItem("href");
 
                                                     if( href != null ) {
-                                                        MachineImage image = loadTemplate(catalog.owner, ((vCloud)getProvider()).toID(href.getNodeValue().trim()), catalog.published);
+                                                        String catalogItemId = ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                                                        MachineImage image = loadTemplate(catalog.owner, catalogItemId, catalog.published);
 
                                                         if( image != null ) {
                                                             if( options == null || options.matches(image) ) {
+                                                                image.setTag("catalogItemId", catalogItemId);
                                                                 iterator.push(image);
                                                             }
                                                         }
@@ -746,9 +748,18 @@ public class TemplateSupport extends AbstractImageSupport {
     public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "Image.remove");
         try {
+            MachineImage image = getImage(providerImageId);
+
+            if( image == null ) {
+                throw new CloudException("No such image: " + providerImageId);
+            }
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            String catalogItemId = (String)image.getTag("catalogItemId");
 
             method.delete("vAppTemplate", providerImageId);
+            if( catalogItemId != null ) {
+                method.delete("catalogItem", catalogItemId);
+            }
         }
         finally {
             APITrace.end();

@@ -25,6 +25,7 @@ import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.vcloud.compute.vCloudComputeServices;
 import org.dasein.cloud.vcloud.network.vCloudNetworkServices;
+import org.dasein.util.CalendarWrapper;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
@@ -207,49 +208,75 @@ public class vCloud extends AbstractCloud {
         if( time == null || time.length() < 1 ) {
             return 0L;
         }
-        //2013-02-02T22:16:45.917-05:00
-        if( time.endsWith("-05:00") || time.endsWith("+00:00") ) {
-            String tz;
+        int idx = time.lastIndexOf("-");
 
-            if( time.endsWith("-05:00") ) {
-                int idx = time.lastIndexOf('-');
+        if( idx > -1 ) {
+            String[] parts = time.substring(idx+1).split(":");
 
-                time = time.substring(0,idx);
-                tz = "America/New York";
-            }
-            else {
-                int idx = time.lastIndexOf('-');
+            time = time.substring(0, idx);
+            if( parts.length == 2 ) {
+                long offset = (Long.parseLong(parts[0]) * CalendarWrapper.HOUR) + (Long.parseLong(parts[1]) * CalendarWrapper.MINUTE);
 
-                time = time.substring(0,idx);
-                tz = "GMT";
-            }
-            SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+                SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+                String[] ids = TimeZone.getAvailableIDs(-((int)offset));
 
-            fmt.setTimeZone(TimeZone.getTimeZone(tz));
-            if( time.length() > 0 ) {
-                try {
-                    return fmt.parse(time).getTime();
+                if( ids.length > 0 ) {
+                    TimeZone zone = TimeZone.getTimeZone(ids[0]);
+
+                    fmt.setTimeZone(zone);
+                    if( time.length() > 0 ) {
+                        try {
+                            return fmt.parse(time).getTime();
+                        }
+                        catch( ParseException e ) {
+                            throw new CloudException("Could not parse date: " + time);
+                        }
+                    }
                 }
-                catch( ParseException e ) {
-                    throw new CloudException("Could not parse date: " + time);
-                }
+
             }
         }
-        else {
-            SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+        idx = time.lastIndexOf("+");
 
-            if( time.length() > 0 ) {
+        if( idx > -1 ) {
+            String[] parts = time.substring(idx+1).split(":");
+
+            time = time.substring(0, idx);
+            if( parts.length == 2 ) {
+                long offset = (Long.parseLong(parts[0]) * CalendarWrapper.HOUR) + (Long.parseLong(parts[1]) * CalendarWrapper.MINUTE);
+
+                SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+                String[] ids = TimeZone.getAvailableIDs((int)offset);
+
+                if( ids.length > 0 ) {
+                    TimeZone zone = TimeZone.getTimeZone(ids[0]);
+
+                    fmt.setTimeZone(zone);
+                    if( time.length() > 0 ) {
+                        try {
+                            return fmt.parse(time).getTime();
+                        }
+                        catch( ParseException e ) {
+                            throw new CloudException("Could not parse date: " + time);
+                        }
+                    }
+                }
+
+            }
+        }
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+
+        if( time.length() > 0 ) {
+            try {
+                return fmt.parse(time).getTime();
+            }
+            catch( ParseException e ) {
+                fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
                 try {
                     return fmt.parse(time).getTime();
                 }
-                catch( ParseException e ) {
-                    fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-                    try {
-                        return fmt.parse(time).getTime();
-                    }
-                    catch( ParseException encore ) {
-                        throw new CloudException("Could not parse date: " + time);
-                    }
+                catch( ParseException encore ) {
+                    throw new CloudException("Could not parse date: " + time);
                 }
             }
         }
