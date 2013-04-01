@@ -40,24 +40,17 @@ import org.dasein.cloud.util.CacheLevel;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudException;
 import org.dasein.cloud.vcloud.vCloudMethod;
-import org.dasein.util.uom.storage.Gigabyte;
+import org.dasein.util.Jiterator;
+import org.dasein.util.JiteratorPopulator;
+import org.dasein.util.PopulatorThread;
 import org.dasein.util.uom.storage.Megabyte;
 import org.dasein.util.uom.storage.Storage;
-import org.dasein.util.uom.time.Day;
-import org.dasein.util.uom.time.TimePeriod;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -84,37 +77,43 @@ public class vAppSupport extends DefunctVM {
     }
 
     public void deploy(@Nonnull String vmId) throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-        String xml = method.get("vApp", vmId);
+        APITrace.begin(getProvider(), "VM.deploy");
+        try {
+            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            String xml = method.get("vApp", vmId);
 
-        if( xml != null ) {
-            NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
+            if( xml != null ) {
+                NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
 
-            for( int i=0; i<nodes.getLength(); i++ ) {
-                NodeList links = nodes.item(i).getChildNodes();
+                for( int i=0; i<nodes.getLength(); i++ ) {
+                    NodeList links = nodes.item(i).getChildNodes();
 
-                for( int j=0; j<links.getLength(); j++ ) {
-                    Node node = links.item(j);
+                    for( int j=0; j<links.getLength(); j++ ) {
+                        Node node = links.item(j);
 
-                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
-                        Node rel = node.getAttributes().getNamedItem("rel");
+                        if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                            Node rel = node.getAttributes().getNamedItem("rel");
 
-                        if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("deploy") ) {
-                            Node href = node.getAttributes().getNamedItem("href");
+                            if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("deploy") ) {
+                                Node href = node.getAttributes().getNamedItem("href");
 
-                            if( href != null ) {
-                                String endpoint = href.getNodeValue().trim();
-                                String action = method.getAction(endpoint);
-                                StringBuilder payload = new StringBuilder();
+                                if( href != null ) {
+                                    String endpoint = href.getNodeValue().trim();
+                                    String action = method.getAction(endpoint);
+                                    StringBuilder payload = new StringBuilder();
 
-                                payload.append("<DeployVAppParams powerOn=\"false\" xmlns=\"http://www.vmware.com/vcloud/v1.5\"/>");
-                                method.waitFor(method.post(action, endpoint, method.getMediaTypeForActionDeployVApp(), payload.toString()));
-                                break;
+                                    payload.append("<DeployVAppParams powerOn=\"false\" xmlns=\"http://www.vmware.com/vcloud/v1.5\"/>");
+                                    method.waitFor(method.post(action, endpoint, method.getMediaTypeForActionDeployVApp(), payload.toString()));
+                                    break;
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+        finally {
+            APITrace.end();
         }
     }
 
@@ -128,13 +127,19 @@ public class vAppSupport extends DefunctVM {
 
     @Override
     public int getMaximumVirtualMachineCount() throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        APITrace.begin(getProvider(), "VM.getMaximumVirtualMachineCount");
+        try {
+            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
-        return method.getVMQuota();
+            return method.getVMQuota();
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     public @Nullable VirtualMachineProduct getProduct(@Nonnull String productId) throws InternalException, CloudException {
-        APITrace.begin(getProvider(), "getVMProduct");
+        APITrace.begin(getProvider(), "VM.getProduct");
         try {
             VirtualMachineProduct product = super.getProduct(productId);
 
@@ -205,7 +210,7 @@ public class vAppSupport extends DefunctVM {
 
     @Override
     public VirtualMachine getVirtualMachine(@Nonnull String vmId) throws InternalException, CloudException {
-        APITrace.begin(getProvider(), "getVirtualMachine");
+        APITrace.begin(getProvider(), "VM.getVirtualMachine");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             String xml = method.get("vApp", vmId);
@@ -288,7 +293,7 @@ public class vAppSupport extends DefunctVM {
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "isSubscribedVM");
+        APITrace.begin(getProvider(), "VM.isSubscribed");
         try {
             return (getProvider().testContext() != null);
         }
@@ -299,7 +304,7 @@ public class vAppSupport extends DefunctVM {
 
     @Override
     public @Nonnull VirtualMachine launch(@Nonnull VMLaunchOptions withLaunchOptions) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "launchVM");
+        APITrace.begin(getProvider(), "VM.launch");
         try {
             String vdcId = withLaunchOptions.getDataCenterId();
 
@@ -521,6 +526,22 @@ public class vAppSupport extends DefunctVM {
                                         xml.append("</ovf:Item>");
                                         xml.append("</ovf:VirtualHardwareSection>");
                                         method.waitFor(method.put("virtualHardwareSection", vmUrl + "/virtualHardwareSection", method.getMediaTypeForVirtualHardwareSection(), xml.toString()));
+
+                                        if( vlan != null ) {
+                                            xml = new StringBuilder();
+                                            xml.append("<NetworkConnectionSection href=\"").append(vmUrl).append("/networkConnectionSection/").append("\" ");
+                                            xml.append("xmlns=\"http://www.vmware.com/vcloud/v1.5\" ");
+                                            xml.append(" type=\"").append(method.getMediaTypeForNetworkConnectionSection()).append("\">");
+                                            xml.append("<Info xmlns=\"http://schemas.dmtf.org/ovf/envelope/1\">Specifies the available VM network connections</Info>");
+                                            xml.append("<PrimaryNetworkConnectionIndex>0</PrimaryNetworkConnectionIndex>");
+                                            xml.append("<NetworkConnection network=\"").append(vCloud.escapeXml(vlan.getName())).append("\">");
+                                            xml.append("<NetworkConnectionIndex>0</NetworkConnectionIndex>");
+                                            xml.append("<IsConnected>true</IsConnected>");
+                                            xml.append("<IpAddressAllocationMode>DHCP</IpAddressAllocationMode>");
+                                            xml.append("</NetworkConnection>");
+                                            xml.append("</NetworkConnectionSection>");
+                                            method.waitFor(method.put("networkConnectionSection", vmUrl + "/networkConnectionSection", method.getMediaTypeForNetworkConnectionSection(), xml.toString()));
+                                        }
                                     }
                                     try {
                                         Map<String,Object> metadata = withLaunchOptions.getMetaData();
@@ -569,127 +590,6 @@ public class vAppSupport extends DefunctVM {
     }
 
     @Override
-    public Iterable<VirtualMachineProduct> listProducts(Architecture architecture) throws InternalException, CloudException {
-        APITrace.begin(getProvider(), "listVMProducts");
-        try {
-            Cache<VirtualMachineProduct> cache = Cache.getInstance(getProvider(), "products" + architecture.name(), VirtualMachineProduct.class, CacheLevel.REGION, new TimePeriod<Day>(1, TimePeriod.DAY));
-            Iterable<VirtualMachineProduct> products = cache.get(getContext());
-
-            if( products == null ) {
-                ArrayList<VirtualMachineProduct> list = new ArrayList<VirtualMachineProduct>();
-
-                try {
-                    String resource = ((vCloud)getProvider()).getVMProductsResource();
-                    InputStream input = vAppSupport.class.getResourceAsStream(resource);
-
-                    if( input != null ) {
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-                        StringBuilder json = new StringBuilder();
-                        String line;
-
-                        while( (line = reader.readLine()) != null ) {
-                            json.append(line);
-                            json.append("\n");
-                        }
-                        JSONArray arr = new JSONArray(json.toString());
-                        JSONObject toCache = null;
-
-                        for( int i=0; i<arr.length(); i++ ) {
-                            JSONObject productSet = arr.getJSONObject(i);
-                            String cloud, provider;
-
-                            if( productSet.has("cloud") ) {
-                                cloud = productSet.getString("cloud");
-                            }
-                            else {
-                                continue;
-                            }
-                            if( productSet.has("provider") ) {
-                                provider = productSet.getString("provider");
-                            }
-                            else {
-                                continue;
-                            }
-                            if( !productSet.has("products") ) {
-                                continue;
-                            }
-                            if( toCache == null || (provider.equals("default") && cloud.equals("default")) ) {
-                                toCache = productSet;
-                            }
-                            if( provider.equalsIgnoreCase(getProvider().getProviderName()) && cloud.equalsIgnoreCase(getProvider().getCloudName()) ) {
-                                toCache = productSet;
-                                break;
-                            }
-                        }
-                        if( toCache == null ) {
-                            logger.warn("No products were defined");
-                            return Collections.emptyList();
-                        }
-                        JSONArray plist = toCache.getJSONArray("products");
-
-                        for( int i=0; i<plist.length(); i++ ) {
-                            JSONObject product = plist.getJSONObject(i);
-                            boolean supported = false;
-
-                            if( product.has("architectures") ) {
-                                JSONArray architectures = product.getJSONArray("architectures");
-
-                                for( int j=0; j<architectures.length(); j++ ) {
-                                    String a = architectures.getString(j);
-
-                                    if( architecture.name().equals(a) ) {
-                                        supported = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if( !supported ) {
-                                continue;
-                            }
-                            if( product.has("excludesRegions") ) {
-                                JSONArray regions = product.getJSONArray("excludesRegions");
-
-                                for( int j=0; j<regions.length(); j++ ) {
-                                    String r = regions.getString(j);
-
-                                    if( r.equals(getContext().getRegionId()) ) {
-                                        supported = false;
-                                        break;
-                                    }
-                                }
-                            }
-                            if( !supported ) {
-                                continue;
-                            }
-                            VirtualMachineProduct prd = toProduct(product);
-
-                            if( prd != null ) {
-                                list.add(prd);
-                            }
-                        }
-                    }
-                    else {
-                        logger.warn("No standard products resource exists for " + resource);
-                    }
-
-                    products = list;
-                    cache.put(getContext(), products);
-                }
-                catch( IOException e ) {
-                    throw new InternalException(e);
-                }
-                catch( JSONException e ) {
-                    throw new InternalException(e);
-                }
-            }
-            return products;
-        }
-        finally {
-            APITrace.end();
-        }
-    }
-
-    @Override
     public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
         Cache<Architecture> cache = Cache.getInstance(getProvider(), "architectures", Architecture.class, CacheLevel.CLOUD);
         Iterable<Architecture> list = cache.get(getContext());
@@ -707,53 +607,64 @@ public class vAppSupport extends DefunctVM {
 
     @Override
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
-        APITrace.begin(getProvider(), "listVirtualMachines");
-        try {
-            Iterable<VLAN> vlans = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans();
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-            ArrayList<VirtualMachine> vms = new ArrayList<VirtualMachine>();
+        getProvider().hold();
+        PopulatorThread<VirtualMachine> populator = new PopulatorThread<VirtualMachine>(new JiteratorPopulator<VirtualMachine>() {
+            @Override
+            public void populate(@Nonnull Jiterator<VirtualMachine> iterator) throws Exception {
+                try {
+                    APITrace.begin(getProvider(), "VM.listVirtualMachines");
+                    try {
+                        Iterable<VLAN> vlans = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans();
+                        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
-            for( DataCenter dc : method.listDataCenters() ) {
-                String xml = method.get("vdc", dc.getProviderDataCenterId());
+                        for( DataCenter dc : method.listDataCenters() ) {
+                            String xml = method.get("vdc", dc.getProviderDataCenterId());
 
-                if( xml != null && !xml.equals("") ) {
-                    NodeList vdcs = method.parseXML(xml).getElementsByTagName("Vdc");
+                            if( xml != null && !xml.equals("") ) {
+                                NodeList vdcs = method.parseXML(xml).getElementsByTagName("Vdc");
 
-                    if( vdcs.getLength() > 0 ) {
-                        NodeList attributes = vdcs.item(0).getChildNodes();
+                                if( vdcs.getLength() > 0 ) {
+                                    NodeList attributes = vdcs.item(0).getChildNodes();
 
-                        for( int i=0; i<attributes.getLength(); i++ ) {
-                            Node attribute = attributes.item(i);
+                                    for( int i=0; i<attributes.getLength(); i++ ) {
+                                        Node attribute = attributes.item(i);
 
-                            if( attribute.getNodeName().equalsIgnoreCase("ResourceEntities") && attribute.hasChildNodes() ) {
-                                NodeList resources = attribute.getChildNodes();
+                                        if( attribute.getNodeName().equalsIgnoreCase("ResourceEntities") && attribute.hasChildNodes() ) {
+                                            NodeList resources = attribute.getChildNodes();
 
-                                for( int j=0; j<resources.getLength(); j++ ) {
-                                    Node resource = resources.item(j);
+                                            for( int j=0; j<resources.getLength(); j++ ) {
+                                                Node resource = resources.item(j);
 
-                                    if( resource.getNodeName().equalsIgnoreCase("ResourceEntity") && resource.hasAttributes() ) {
-                                        Node type = resource.getAttributes().getNamedItem("type");
+                                                if( resource.getNodeName().equalsIgnoreCase("ResourceEntity") && resource.hasAttributes() ) {
+                                                    Node type = resource.getAttributes().getNamedItem("type");
 
-                                        if( type != null && type.getNodeValue().equalsIgnoreCase(method.getMediaTypeForVApp()) ) {
-                                            Node href = resource.getAttributes().getNamedItem("href");
+                                                    if( type != null && type.getNodeValue().equalsIgnoreCase(method.getMediaTypeForVApp()) ) {
+                                                        Node href = resource.getAttributes().getNamedItem("href");
 
-                                            loadVmsFor(dc.getProviderDataCenterId(), ((vCloud)getProvider()).toID(href.getNodeValue().trim()), vms, vlans);
+                                                        loadVmsFor(dc.getProviderDataCenterId(), ((vCloud)getProvider()).toID(href.getNodeValue().trim()), iterator, vlans);
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
+                    finally {
+                        APITrace.end();
+                    }
+                }
+                finally {
+                    getProvider().release();
                 }
             }
-            return vms;
-        }
-        finally {
-            APITrace.end();
-        }
+        });
+        populator.populate();
+        return populator.getResult();
     }
 
-    private void loadVmsFor(@Nonnull String vdcId, @Nonnull String id, @Nonnull ArrayList<VirtualMachine> vms, @Nonnull Iterable<VLAN> vlans) throws InternalException, CloudException {
+    private void loadVmsFor(@Nonnull String vdcId, @Nonnull String id, @Nonnull Jiterator<VirtualMachine> vms, @Nonnull Iterable<VLAN> vlans) throws InternalException, CloudException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
         String xml = method.get("vApp", id);
@@ -781,7 +692,7 @@ public class vAppSupport extends DefunctVM {
                         VirtualMachine vm = toVirtualMachine(vdcId, id, vmNode, vlans);
 
                         if( vm != null ) {
-                            vms.add(vm);
+                            vms.push(vm);
                         }
                     }
                 }
@@ -791,7 +702,7 @@ public class vAppSupport extends DefunctVM {
 
     @Override
     public void reboot(@Nonnull String vmId) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "rebootVM");
+        APITrace.begin(getProvider(), "VM.reboot");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             String xml = method.get("vApp", vmId);
@@ -827,7 +738,7 @@ public class vAppSupport extends DefunctVM {
 
     @Override
     public void resume(@Nonnull String vmId) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "resumeVM");
+        APITrace.begin(getProvider(), "VM.resume");
         try {
             startVapp(vmId);
         }
@@ -837,7 +748,7 @@ public class vAppSupport extends DefunctVM {
     }
     @Override
     public void start(@Nonnull String vmId) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "startVM");
+        APITrace.begin(getProvider(), "VM.start");
         try {
             startVapp(vmId);
         }
@@ -885,68 +796,68 @@ public class vAppSupport extends DefunctVM {
 
     @Override
     public void stop(@Nonnull String vmId, boolean force) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "stopVM");
-        try {
-            stop(vmId, force, false);
-        }
-        finally {
-            APITrace.end();
-        }
+        stop(vmId, force, false);
     }
 
     public void stop(@Nonnull String vmId, boolean force, boolean wait) throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-        String xml = method.get("vApp", vmId);
+        APITrace.begin(getProvider(), "VM.stop");
+        try {
+            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            String xml = method.get("vApp", vmId);
 
-        if( xml != null ) {
-            Document doc = method.parseXML(xml);
-            NodeList nodes = doc.getElementsByTagName("VApp");
+            if( xml != null ) {
+                Document doc = method.parseXML(xml);
+                NodeList nodes = doc.getElementsByTagName("VApp");
 
-            if( nodes.getLength() < 1 ) {
-                nodes = doc.getElementsByTagName("Vm");
-            }
-            for( int i=0; i<nodes.getLength(); i++ ) {
-                NodeList links = nodes.item(i).getChildNodes();
+                if( nodes.getLength() < 1 ) {
+                    nodes = doc.getElementsByTagName("Vm");
+                }
+                for( int i=0; i<nodes.getLength(); i++ ) {
+                    NodeList links = nodes.item(i).getChildNodes();
 
-                for( int j=0; j<links.getLength(); j++ ) {
-                    Node node = links.item(j);
+                    for( int j=0; j<links.getLength(); j++ ) {
+                        Node node = links.item(j);
 
-                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
-                        Node rel = node.getAttributes().getNamedItem("rel");
+                        if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                            Node rel = node.getAttributes().getNamedItem("rel");
 
-                        if( force && rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:powerOff") ) {
-                            Node href = node.getAttributes().getNamedItem("href");
+                            if( force && rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:powerOff") ) {
+                                Node href = node.getAttributes().getNamedItem("href");
 
-                            if( href != null ) {
-                                String endpoint = href.getNodeValue().trim();
-                                String action = method.getAction(endpoint);
+                                if( href != null ) {
+                                    String endpoint = href.getNodeValue().trim();
+                                    String action = method.getAction(endpoint);
 
-                                String task = method.post(action, endpoint, null, null);
+                                    String task = method.post(action, endpoint, null, null);
 
-                                if( wait ) {
-                                    method.waitFor(task);
+                                    if( wait ) {
+                                        method.waitFor(task);
+                                    }
+                                    break;
                                 }
-                                break;
                             }
-                        }
-                        else if( !force && rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:shutdown") ) {
-                            Node href = node.getAttributes().getNamedItem("href");
+                            else if( !force && rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:shutdown") ) {
+                                Node href = node.getAttributes().getNamedItem("href");
 
-                            if( href != null ) {
-                                String endpoint = href.getNodeValue().trim();
-                                String action = method.getAction(endpoint);
+                                if( href != null ) {
+                                    String endpoint = href.getNodeValue().trim();
+                                    String action = method.getAction(endpoint);
 
-                                String task = method.post(action, endpoint, null, null);
+                                    String task = method.post(action, endpoint, null, null);
 
-                                if( wait ) {
-                                    method.waitFor(task);
+                                    if( wait ) {
+                                        method.waitFor(task);
+                                    }
+                                    break;
                                 }
-                                break;
                             }
                         }
                     }
                 }
             }
+        }
+        finally {
+            APITrace.end();
         }
     }
 
@@ -962,7 +873,7 @@ public class vAppSupport extends DefunctVM {
 
     @Override
     public void suspend(@Nonnull String vmId) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "suspendVM");
+        APITrace.begin(getProvider(), "VM.suspend");
         try {
             suspendVapp(vmId);
         }
@@ -1010,7 +921,7 @@ public class vAppSupport extends DefunctVM {
 
     @Override
     public void terminate(@Nonnull String vmId) throws InternalException, CloudException {
-        APITrace.begin(getProvider(), "terminateVM");
+        APITrace.begin(getProvider(), "VM.terminate");
         try {
             VirtualMachine vm = getVirtualMachine(vmId);
 
@@ -1018,12 +929,14 @@ public class vAppSupport extends DefunctVM {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
             String vappId = (String)vm.getTag(PARENT_VAPP_ID);
-            ArrayList<VirtualMachine> vms = new ArrayList<VirtualMachine>();
+            Jiterator<VirtualMachine> vms = new Jiterator<VirtualMachine>();
             boolean contains = false;
+            int count = 0;
 
             loadVmsFor(vm.getProviderDataCenterId(), vappId, vms, ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans());
 
             for( VirtualMachine v : vms ) {
+                count++;
                 if( v.getProviderVirtualMachineId().equals(vmId) ) {
                     contains = true;
                     break;
@@ -1031,7 +944,7 @@ public class vAppSupport extends DefunctVM {
             }
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
-            if( vms.size() == 1 && contains ) {
+            if( count == 1 && contains ) {
                 try { undeploy(vappId); }
                 catch( Throwable ignore ) { }
                 method.delete("vApp", vappId);
@@ -1045,64 +958,6 @@ public class vAppSupport extends DefunctVM {
         finally {
             APITrace.end();
         }
-    }
-
-    private @Nullable VirtualMachineProduct toProduct(@Nonnull JSONObject json) throws InternalException {
-        VirtualMachineProduct prd = new VirtualMachineProduct();
-
-        try {
-            if( json.has("id") ) {
-                prd.setProviderProductId(json.getString("id"));
-            }
-            else {
-                return null;
-            }
-            if( json.has("name") ) {
-                prd.setName(json.getString("name"));
-            }
-            else {
-                prd.setName(prd.getProviderProductId());
-            }
-            if( json.has("description") ) {
-                prd.setDescription(json.getString("description"));
-            }
-            else {
-                prd.setDescription(prd.getName());
-            }
-            if( json.has("cpuCount") ) {
-                prd.setCpuCount(json.getInt("cpuCount"));
-            }
-            else {
-                prd.setCpuCount(1);
-            }
-            if( json.has("rootVolumeSizeInGb") ) {
-                prd.setRootVolumeSize(new Storage<Gigabyte>(json.getInt("rootVolumeSizeInGb"), Storage.GIGABYTE));
-            }
-            else {
-                prd.setRootVolumeSize(new Storage<Gigabyte>(1, Storage.GIGABYTE));
-            }
-            if( json.has("ramSizeInMb") ) {
-                prd.setRamSize(new Storage<Megabyte>(json.getInt("ramSizeInMb"), Storage.MEGABYTE));
-            }
-            else {
-                prd.setRamSize(new Storage<Megabyte>(512, Storage.MEGABYTE));
-            }
-            if( json.has("standardHourlyRates") ) {
-                JSONArray rates = json.getJSONArray("standardHourlyRates");
-
-                for( int i=0; i<rates.length(); i++ ) {
-                    JSONObject rate = rates.getJSONObject(i);
-
-                    if( rate.has("rate") ) {
-                        prd.setStandardHourlyRate((float)rate.getDouble("rate"));
-                    }
-                }
-            }
-        }
-        catch( JSONException e ) {
-            throw new InternalException(e);
-        }
-        return prd;
     }
 
     private @Nonnull VmState toState(@Nonnull String status) throws CloudException {

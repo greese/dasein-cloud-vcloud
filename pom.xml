@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-vcloud</artifactId>
-  <version>2013.02.2-SNAPSHOT</version>
+  <version>2013.04.1-SNAPSHOT</version>
   <name>Dasein Cloud vCloud</name>
   <description>Dasein Cloud implementation for the vCloud API</description>
   
@@ -40,14 +40,14 @@
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2013.02.1</version>
+        <version>2013.04.1</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-util</artifactId>
-        <version>2012.08</version>
+        <version>2013.02</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>
@@ -62,20 +62,22 @@
         <version>1.2.17</version>
         <scope>compile</scope>
         <optional>false</optional>
-    </dependency>  
+    </dependency>
+
+      <!-- Provided -->
     <dependency>
     	<groupId>javax.servlet</groupId>
     	<artifactId>servlet-api</artifactId>
     	<version>2.5</version>
     	<type>jar</type>
-    	<scope>compile</scope>
+    	<scope>provided</scope>
     </dependency>
 
       <!-- Test -->
       <dependency>
           <groupId>org.dasein</groupId>
           <artifactId>dasein-cloud-test</artifactId>
-          <version>2013.02.3</version>
+          <version>2013.04.4</version>
           <scope>test</scope>
           <optional>false</optional>
       </dependency>
@@ -175,6 +177,10 @@
         <configuration>
             <systemProperties>
                 <property>
+                    <name>providerClass</name>
+                    <value>${providerClass}</value>
+                </property>
+                <property>
                     <name>endpoint</name>
                     <value>${endpoint}</value>
                 </property>
@@ -191,6 +197,14 @@
                     <value>${apiSecretKey}</value>
                 </property>
                 <property>
+                    <name>accessPublic</name>
+                    <value>${apiSharedKey}</value>
+                </property>
+                <property>
+                    <name>accessPrivate</name>
+                    <value>${apiSecretKey}</value>
+                </property>
+                <property>
                     <name>cloudName</name>
                     <value>${cloudName}</value>
                 </property>
@@ -204,7 +218,7 @@
                 </property>
                 <property>
                     <name>test.region</name>
-                    <value>${test.region}</value>
+                    <value>${regionId}</value>
                 </property>
                 <property>
                     <name>test.dataCenter</name>
@@ -223,9 +237,9 @@
                     <value>${compat}</value>
                 </property>
             </systemProperties>
-          <includes>
-            <!-- <include>**/vCloudTestSuite.java</include> -->
-          </includes>
+          <excludes>
+            <exclude>**/TestSuite.java</exclude>
+          </excludes>
         </configuration>
       </plugin>     
       <plugin>

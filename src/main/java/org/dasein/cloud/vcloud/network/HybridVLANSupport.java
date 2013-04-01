@@ -2,15 +2,17 @@ package org.dasein.cloud.vcloud.network;
 
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.OperationNotSupportedException;
-import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.network.VLANState;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.Cache;
+import org.dasein.cloud.util.CacheLevel;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
+import org.dasein.util.uom.time.Minute;
+import org.dasein.util.uom.time.TimePeriod;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -47,7 +49,7 @@ public class HybridVLANSupport extends DefunctVLAN {
 
     @Override
     public int getMaxVlanCount() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "getMaxVlanCount");
+        APITrace.begin(getProvider(), "VLAN.getMaxVlanCount");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
@@ -75,7 +77,7 @@ public class HybridVLANSupport extends DefunctVLAN {
 
     @Override
     public VLAN getVlan(@Nonnull String vlanId) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "getVlan");
+        APITrace.begin(getProvider(), "VLAN.getVlan");
         try {
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
@@ -95,7 +97,7 @@ public class HybridVLANSupport extends DefunctVLAN {
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "isSubscribedVLAN");
+        APITrace.begin(getProvider(), "VLAN.isSubscribed");
         try {
             return (getProvider().testContext() != null);
         }
@@ -115,25 +117,15 @@ public class HybridVLANSupport extends DefunctVLAN {
     }
 
     @Override
-    public @Nonnull Iterable<ResourceStatus> listVlanStatus() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "listVlanStatus");
-        try {
-            ArrayList<ResourceStatus> status = new ArrayList<ResourceStatus>();
-
-            for( VLAN vlan : listVlans() ) {
-                status.add(new ResourceStatus(vlan.getProviderVlanId(), vlan.getCurrentState()));
-            }
-            return status;
-        }
-        finally {
-            APITrace.end();
-        }
-    }
-
-    @Override
     public @Nonnull Iterable<VLAN> listVlans() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "listVlans");
+        APITrace.begin(getProvider(), "VLAN.listVlans");
         try {
+            Cache<VLAN> cache = Cache.getInstance(getProvider(), "networks", VLAN.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(5, TimePeriod.MINUTE));
+            Iterable<VLAN> cached = cache.get(getContext());
+
+            if( cached != null ) {
+                return cached;
+            }
             vCloudMethod method = new vCloudMethod((vCloud)getProvider());
             ArrayList<VLAN> vlans = new ArrayList<VLAN>();
 
@@ -170,6 +162,7 @@ public class HybridVLANSupport extends DefunctVLAN {
                     }
                 }
             }
+            cache.put(getContext(), vlans);
             return vlans;
         }
         finally {
@@ -396,7 +389,7 @@ public class HybridVLANSupport extends DefunctVLAN {
             tags.put("netmask", netmask);
         }
         if( netmask != null && gateway != null ) {
-            setCidr(vlan, netmask, gateway);
+            vlan.setCidr(netmask, gateway);
         }
         tags.put("shared", String.valueOf(shared));
         if( vlan.getName() == null ) {
@@ -411,7 +404,7 @@ public class HybridVLANSupport extends DefunctVLAN {
 
     @Override
     public void removeVlan(String vlanId) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "removeVlan");
+        APITrace.begin(getProvider(), "VLAN.removeVlan");
         try {
             throw new OperationNotSupportedException("VLAN deletion not yet supported");
         }
