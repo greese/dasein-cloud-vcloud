@@ -300,7 +300,7 @@ public class vCloud extends AbstractCloud {
                 return ctx.getAccountNumber();
             }
             catch( Throwable t ) {
-                logger.warn("Unable to connect to AWS for " + ctx.getAccountNumber() + ": " + t.getMessage());
+                logger.warn("Unable to connect to " + getCloudName() + " for " + ctx.getAccountNumber() + ": " + t.getMessage());
                 return null;
             }
         }
