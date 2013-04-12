@@ -224,7 +224,7 @@
                 </property>
             </systemProperties>
           <includes>
-            <include>**/TestSuite.java</include>
+            <!-- <include>**/TestSuite.java</include> -->
           </includes>
         </configuration>
       </plugin>     
