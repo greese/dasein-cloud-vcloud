@@ -784,7 +784,7 @@ public class TemplateSupport implements MachineImageSupport {
                         ok = true;
                     }
                 }
-                if( ok ) {
+                if( !ok ) {
                     return Collections.emptyList();
                 }
             }
@@ -1170,7 +1170,7 @@ public class TemplateSupport implements MachineImageSupport {
             matches.add(img);
         }
         for( MachineImage img : searchPublicImages(keyword, platform, architecture, ImageClass.MACHINE) ) {
-            if( matches.contains(img) ) {
+            if( !matches.contains(img) ) {
                 matches.add(img);
             }
         }
