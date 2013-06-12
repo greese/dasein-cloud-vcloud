@@ -1212,7 +1212,7 @@ public class TemplateSupport implements MachineImageSupport {
 
     @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        return false;
+        return cls.equals(ImageClass.MACHINE);
     }
 
     @Override
