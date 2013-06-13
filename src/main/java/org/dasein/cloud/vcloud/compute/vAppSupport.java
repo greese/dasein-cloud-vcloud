@@ -568,7 +568,7 @@ public class vAppSupport extends AbstractVMSupport {
                 if( vmId == null ) {
                     throw new CloudException("No virtual machines exist in " + vappId);
                 }
-                startVapp(vappId);
+                startVapp(vappId, true);
                 VirtualMachine vm = getVirtualMachine(vmId);
 
                 if( vm == null ) {
@@ -740,7 +740,7 @@ public class vAppSupport extends AbstractVMSupport {
     public void resume(@Nonnull String vmId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.resume");
         try {
-            startVapp(vmId);
+            startVapp(vmId, true);
         }
         finally {
             APITrace.end();
@@ -750,14 +750,14 @@ public class vAppSupport extends AbstractVMSupport {
     public void start(@Nonnull String vmId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.start");
         try {
-            startVapp(vmId);
+            startVapp(vmId, true);
         }
         finally {
             APITrace.end();
         }
     }
 
-    private void startVapp(@Nonnull String vappId) throws CloudException, InternalException {
+    private void startVapp(@Nonnull String vappId, boolean wait) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("vApp", vappId);
 
@@ -784,7 +784,11 @@ public class vAppSupport extends AbstractVMSupport {
                                 String endpoint = href.getNodeValue().trim();
                                 String action = method.getAction(endpoint);
 
-                                method.post(action, endpoint, null, null);
+                                String task = method.post(action, endpoint, null, null);
+
+                                if( wait ) {
+                                    method.waitFor(task);
+                                }
                                 break;
                             }
                         }
@@ -796,7 +800,7 @@ public class vAppSupport extends AbstractVMSupport {
 
     @Override
     public void stop(@Nonnull String vmId, boolean force) throws CloudException, InternalException {
-        stop(vmId, force, false);
+        stop(vmId, force, true);
     }
 
     public void stop(@Nonnull String vmId, boolean force, boolean wait) throws CloudException, InternalException {
