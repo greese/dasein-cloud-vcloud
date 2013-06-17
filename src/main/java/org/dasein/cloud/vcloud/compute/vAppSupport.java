@@ -1310,24 +1310,31 @@ public class vAppSupport extends AbstractVMSupport {
     }
 
     private @Nonnull String validateHostName(@Nonnull String src) {
-        if( src.length() > 11 ) {
-            src = src.substring(src.length()-10);
-        }
-        StringBuilder newName = new StringBuilder();
+        StringBuilder str = new StringBuilder();
+        src = src.toLowerCase();
+        for( int i=0; i<src.length(); i++ ) {
+            char c = src.charAt(i);
 
-        for( int i=0; i<11; i++ ) {
-            if( i >= src.length() ) {
-                return newName.toString();
-            }
-            char c = src.toLowerCase().charAt(i);
-
-            if( (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ) {
-                if( i == 0 && c < 'a' || c > 'z' ) {
-                    newName.append("x");
+            if( str.length() < 1 ) {
+                if( Character.isLetterOrDigit(c) ) {
+                    str.append(c);
                 }
-                newName.append(c);
+            }
+            else {
+                if( Character.isLetterOrDigit(c) ) {
+                    str.append(c);
+                }
+                else if( c == '-' ) {
+                    str.append(c);
+                }
+                else if( c == ' ' ) {
+                    str.append('-');
+                }
             }
         }
-        return newName.toString();
+        if( str.length() < 1 ) {
+            str.append("unnamed");
+        }
+        return str.toString();
     }
 }
