@@ -568,7 +568,7 @@ public class vAppSupport extends AbstractVMSupport {
                 if( vmId == null ) {
                     throw new CloudException("No virtual machines exist in " + vappId);
                 }
-                startVapp(vappId);
+                startVapp(vappId, true);
                 VirtualMachine vm = getVirtualMachine(vmId);
 
                 if( vm == null ) {
@@ -740,7 +740,7 @@ public class vAppSupport extends AbstractVMSupport {
     public void resume(@Nonnull String vmId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.resume");
         try {
-            startVapp(vmId);
+            startVapp(vmId, true);
         }
         finally {
             APITrace.end();
@@ -750,14 +750,14 @@ public class vAppSupport extends AbstractVMSupport {
     public void start(@Nonnull String vmId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.start");
         try {
-            startVapp(vmId);
+            startVapp(vmId, true);
         }
         finally {
             APITrace.end();
         }
     }
 
-    private void startVapp(@Nonnull String vappId) throws CloudException, InternalException {
+    private void startVapp(@Nonnull String vappId, boolean wait) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("vApp", vappId);
 
@@ -784,7 +784,11 @@ public class vAppSupport extends AbstractVMSupport {
                                 String endpoint = href.getNodeValue().trim();
                                 String action = method.getAction(endpoint);
 
-                                method.post(action, endpoint, null, null);
+                                String task = method.post(action, endpoint, null, null);
+
+                                if( wait ) {
+                                    method.waitFor(task);
+                                }
                                 break;
                             }
                         }
@@ -796,7 +800,7 @@ public class vAppSupport extends AbstractVMSupport {
 
     @Override
     public void stop(@Nonnull String vmId, boolean force) throws CloudException, InternalException {
-        stop(vmId, force, false);
+        stop(vmId, force, true);
     }
 
     public void stop(@Nonnull String vmId, boolean force, boolean wait) throws CloudException, InternalException {
@@ -1306,24 +1310,31 @@ public class vAppSupport extends AbstractVMSupport {
     }
 
     private @Nonnull String validateHostName(@Nonnull String src) {
-        if( src.length() > 11 ) {
-            src = src.substring(src.length()-10);
-        }
-        StringBuilder newName = new StringBuilder();
+        StringBuilder str = new StringBuilder();
+        src = src.toLowerCase();
+        for( int i=0; i<src.length(); i++ ) {
+            char c = src.charAt(i);
 
-        for( int i=0; i<11; i++ ) {
-            if( i >= src.length() ) {
-                return newName.toString();
-            }
-            char c = src.toLowerCase().charAt(i);
-
-            if( (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ) {
-                if( i == 0 && c < 'a' || c > 'z' ) {
-                    newName.append("x");
+            if( str.length() < 1 ) {
+                if( Character.isLetterOrDigit(c) ) {
+                    str.append(c);
                 }
-                newName.append(c);
+            }
+            else {
+                if( Character.isLetterOrDigit(c) ) {
+                    str.append(c);
+                }
+                else if( c == '-' ) {
+                    str.append(c);
+                }
+                else if( c == ' ' ) {
+                    str.append('-');
+                }
             }
         }
-        return newName.toString();
+        if( str.length() < 1 ) {
+            str.append("unnamed");
+        }
+        return str.toString();
     }
 }
