@@ -611,8 +611,8 @@ public class vCloudMethod {
                 if( org.endpoint == null ) {
                     throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), "No Org", "No org was identified for " + ctx.getAccountNumber());
                 }
-                cache.put(ctx, Collections.singletonList(org));
                 loadVDCs(org);
+                cache.put(ctx, Collections.singletonList(org));
                 return org;
             }
             finally {
