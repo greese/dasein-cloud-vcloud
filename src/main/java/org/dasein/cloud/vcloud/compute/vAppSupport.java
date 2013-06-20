@@ -88,15 +88,21 @@ public class vAppSupport extends DefunctVM {
         String xml = method.get("vApp", vmId);
 
         if( xml != null ) {
-            NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
+            Document doc = method.parseXML(xml);
+            String docElementTagName = doc.getDocumentElement().getTagName();
+            String nsString = "";
+            if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+            NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
 
             for( int i=0; i<nodes.getLength(); i++ ) {
                 NodeList links = nodes.item(i).getChildNodes();
 
                 for( int j=0; j<links.getLength(); j++ ) {
                     Node node = links.item(j);
+                    if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                    if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
                         Node rel = node.getAttributes().getNamedItem("rel");
 
                         if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("deploy") ) {
@@ -173,7 +179,11 @@ public class vAppSupport extends DefunctVM {
         if( xml == null || xml.equals("") ) {
             return null;
         }
-        NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
+        Document doc = method.parseXML(xml);
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
 
         if( nodes.getLength() < 1 ) {
             return null;
@@ -183,8 +193,10 @@ public class vAppSupport extends DefunctVM {
 
         for( int i=0; i<elements.getLength(); i++ ) {
             Node n = elements.item(i);
+            if(n.getNodeName().contains(":"))nsString = n.getNodeName().substring(0, n.getNodeName().indexOf(":") + 1);
+            else nsString = "";
 
-            if( n.getNodeName().equalsIgnoreCase("Link") && n.hasAttributes() ) {
+            if( n.getNodeName().equalsIgnoreCase(nsString + "Link") && n.hasAttributes() ) {
                 Node rel = n.getAttributes().getNamedItem("rel");
 
                 if( rel != null && rel.getNodeValue().trim().equals("up") ) {
@@ -212,10 +224,10 @@ public class vAppSupport extends DefunctVM {
 
             if( xml != null && !xml.equals("") ) {
                 Document doc = method.parseXML(xml);
-
-                doc.getNodeName();
-
-                NodeList vmNodes = doc.getElementsByTagName("Vm");
+                String docElementTagName = doc.getDocumentElement().getTagName();
+                String nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                NodeList vmNodes = doc.getElementsByTagName(nsString + "Vm");
 
                 if( vmNodes.getLength() < 1 ) {
                     return null;
@@ -226,8 +238,10 @@ public class vAppSupport extends DefunctVM {
 
                 for( int i=0; i<vmElements.getLength(); i++ ) {
                     Node n = vmElements.item(i);
+                    if(n.getNodeName().contains(":"))nsString = n.getNodeName().substring(0, n.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( n.getNodeName().equalsIgnoreCase("Link") && n.hasAttributes() ) {
+                    if( n.getNodeName().equalsIgnoreCase(nsString + "Link") && n.hasAttributes() ) {
                         Node rel = n.getAttributes().getNamedItem("rel");
 
                         if( rel != null && rel.getNodeValue().trim().equals("up") ) {
@@ -427,7 +441,11 @@ public class vAppSupport extends DefunctVM {
             }
             String response = method.post(vCloudMethod.COMPOSE_VAPP, vdcId, xml.toString());
 
-            NodeList vapps = method.parseXML(response).getElementsByTagName("VApp");
+            Document doc = method.parseXML(response);
+            String docElementTagName = doc.getDocumentElement().getTagName();
+            String nsString = "";
+            if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+            NodeList vapps = doc.getElementsByTagName(nsString + "VApp");
 
             if( vapps.getLength() < 1 ) {
                 throw new CloudException("The instatiation operation succeeded, but no vApp was present");
@@ -444,7 +462,11 @@ public class vAppSupport extends DefunctVM {
                 if( response == null || response.equals("") ) {
                     throw new CloudException("vApp " + vappId + " went away");
                 }
-                vapps = method.parseXML(response).getElementsByTagName("VApp");
+                doc = method.parseXML(response);
+                docElementTagName = doc.getDocumentElement().getTagName();
+                nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                vapps = doc.getElementsByTagName(nsString + "VApp");
                 if( vapps.getLength() < 1 ) {
                     throw new CloudException("No VApp in vApp request for " + vappId);
                 }
@@ -453,8 +475,10 @@ public class vAppSupport extends DefunctVM {
 
                 for( int i=0; i<tasks.getLength(); i++ ) {
                     Node task = tasks.item(i);
+                    if(task.getNodeName().contains(":"))nsString = task.getNodeName().substring(0, task.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( task.getNodeName().equalsIgnoreCase("Task") ) {
+                    if( task.getNodeName().equalsIgnoreCase(nsString + "Task") ) {
                         href = task.getAttributes().getNamedItem("href");
                         if( href != null ) {
                             method.waitFor(href.getNodeValue().trim());
@@ -468,7 +492,11 @@ public class vAppSupport extends DefunctVM {
                 if( x == null ) {
                     throw new CloudException("vApp went away");
                 }
-                vapps = method.parseXML(x).getElementsByTagName("VApp");
+                doc = method.parseXML(response);
+                docElementTagName = doc.getDocumentElement().getTagName();
+                nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                vapps = doc.getElementsByTagName(nsString + "VApp");
                 if( vapps.getLength() < 1 ) {
                     throw new CloudException("vApp went away");
                 }
@@ -478,14 +506,18 @@ public class vAppSupport extends DefunctVM {
 
                 for( int i=0; i<attributes.getLength(); i++ ) {
                     Node attribute = attributes.item(i);
+                    if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( attribute.getNodeName().equals("Children") && attribute.hasChildNodes() ) {
+                    if( attribute.getNodeName().equals(nsString + "Children") && attribute.hasChildNodes() ) {
                         NodeList children = attribute.getChildNodes();
 
                         for( int j=0; j<children.getLength(); j++ ) {
                             Node vm = children.item(j);
+                            if(vm.getNodeName().contains(":"))nsString = vm.getNodeName().substring(0, vm.getNodeName().indexOf(":") + 1);
+                            else nsString = "";
 
-                            if( vm.getNodeName().equalsIgnoreCase("Vm") && vm.hasAttributes() ) {
+                            if( vm.getNodeName().equalsIgnoreCase(nsString + "Vm") && vm.hasAttributes() ) {
                                 href = vm.getAttributes().getNamedItem("href");
                                 if( href != null ) {
                                     String vmUrl = href.getNodeValue().trim();
@@ -736,21 +768,27 @@ public class vAppSupport extends DefunctVM {
                 String xml = method.get("vdc", dc.getProviderDataCenterId());
 
                 if( xml != null && !xml.equals("") ) {
-                    NodeList vdcs = method.parseXML(xml).getElementsByTagName("Vdc");
+                    Document doc = method.parseXML(xml);
+                    String docElementTagName = doc.getDocumentElement().getTagName();
+                    String nsString = "";
+                    if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                    NodeList vdcs = doc.getElementsByTagName(nsString + "Vdc");
 
                     if( vdcs.getLength() > 0 ) {
                         NodeList attributes = vdcs.item(0).getChildNodes();
 
                         for( int i=0; i<attributes.getLength(); i++ ) {
                             Node attribute = attributes.item(i);
+                            if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+                            else nsString = "";
 
-                            if( attribute.getNodeName().equalsIgnoreCase("ResourceEntities") && attribute.hasChildNodes() ) {
+                            if( attribute.getNodeName().equalsIgnoreCase(nsString + "ResourceEntities") && attribute.hasChildNodes() ) {
                                 NodeList resources = attribute.getChildNodes();
 
                                 for( int j=0; j<resources.getLength(); j++ ) {
                                     Node resource = resources.item(j);
 
-                                    if( resource.getNodeName().equalsIgnoreCase("ResourceEntity") && resource.hasAttributes() ) {
+                                    if( resource.getNodeName().equalsIgnoreCase(nsString + "ResourceEntity") && resource.hasAttributes() ) {
                                         Node type = resource.getAttributes().getNamedItem("type");
 
                                         if( type != null && type.getNodeValue().equalsIgnoreCase(method.getMediaTypeForVApp()) ) {
@@ -780,7 +818,11 @@ public class vAppSupport extends DefunctVM {
         if( xml == null || xml.equals("") ) {
             return;
         }
-        NodeList vapps = method.parseXML(xml).getElementsByTagName("VApp");
+        Document doc = method.parseXML(xml);
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList vapps = doc.getElementsByTagName(nsString + "VApp");
 
         if( vapps.getLength() < 1 ) {
             return;
@@ -789,14 +831,16 @@ public class vAppSupport extends DefunctVM {
 
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attribute = attributes.item(i);
+            if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+            else nsString = "";
 
-            if( attribute.getNodeName().equals("Children") && attribute.hasChildNodes() ) {
+            if( attribute.getNodeName().equals(nsString + "Children") && attribute.hasChildNodes() ) {
                 NodeList children = attribute.getChildNodes();
 
                 for( int j=0; j<children.getLength(); j++ ) {
                     Node vmNode = children.item(j);
 
-                    if( vmNode.getNodeName().equalsIgnoreCase("Vm") && vmNode.hasAttributes() ) {
+                    if( vmNode.getNodeName().equalsIgnoreCase(nsString + "Vm") && vmNode.hasAttributes() ) {
                         VirtualMachine vm = toVirtualMachine(vdcId, id, vmNode, vlans);
 
                         if( vm != null ) {
@@ -816,12 +860,18 @@ public class vAppSupport extends DefunctVM {
             String xml = method.get("vApp", vmId);
 
             if( xml != null ) {
-                NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
+                Document doc = method.parseXML(xml);
+                String docElementTagName = doc.getDocumentElement().getTagName();
+                String nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
 
                 for( int i=0; i<nodes.getLength(); i++ ) {
                     Node node = nodes.item(i);
+                    if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                    if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
                         Node rel = node.getAttributes().getNamedItem("rel");
 
                         if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:reboot") ) {
@@ -871,18 +921,23 @@ public class vAppSupport extends DefunctVM {
 
         if( xml != null ) {
             Document doc = method.parseXML(xml);
-            NodeList nodes = doc.getElementsByTagName("VApp");
+            String docElementTagName = doc.getDocumentElement().getTagName();
+            String nsString = "";
+            if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+            NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
 
             if( nodes.getLength() < 1 ) {
-                nodes = doc.getElementsByTagName("Vm");
+                nodes = doc.getElementsByTagName(nsString + "Vm");
             }
             for( int i=0; i<nodes.getLength(); i++ ) {
                 NodeList links = nodes.item(i).getChildNodes();
 
                 for( int j=0; j<links.getLength(); j++ ) {
                     Node node = links.item(j);
+                    if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                    if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
                         Node rel = node.getAttributes().getNamedItem("rel");
 
                         if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:powerOn") ) {
@@ -923,18 +978,23 @@ public class vAppSupport extends DefunctVM {
 
         if( xml != null ) {
             Document doc = method.parseXML(xml);
-            NodeList nodes = doc.getElementsByTagName("VApp");
+            String docElementTagName = doc.getDocumentElement().getTagName();
+            String nsString = "";
+            if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+            NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
 
             if( nodes.getLength() < 1 ) {
-                nodes = doc.getElementsByTagName("Vm");
+                nodes = doc.getElementsByTagName(nsString + "Vm");
             }
             for( int i=0; i<nodes.getLength(); i++ ) {
                 NodeList links = nodes.item(i).getChildNodes();
 
                 for( int j=0; j<links.getLength(); j++ ) {
                     Node node = links.item(j);
+                    if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                    if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
                         Node rel = node.getAttributes().getNamedItem("rel");
 
                         if( force && rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:powerOff") ) {
@@ -1000,18 +1060,23 @@ public class vAppSupport extends DefunctVM {
 
         if( xml != null ) {
             Document doc = method.parseXML(xml);
-            NodeList nodes = doc.getElementsByTagName("VApp");
+            String docElementTagName = doc.getDocumentElement().getTagName();
+            String nsString = "";
+            if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+            NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
 
             if( nodes.getLength() < 1 ) {
-                nodes = doc.getElementsByTagName("Vm");
+                nodes = doc.getElementsByTagName(nsString + "Vm");
             }
             for( int i=0; i<nodes.getLength(); i++ ) {
                 NodeList links = nodes.item(i).getChildNodes();
 
                 for( int j=0; j<links.getLength(); j++ ) {
                     Node node = links.item(j);
+                    if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                    if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
                         Node rel = node.getAttributes().getNamedItem("rel");
 
                         if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:suspend") ) {
@@ -1429,18 +1494,24 @@ public class vAppSupport extends DefunctVM {
         String xml = method.get("vApp", vmId);
 
         if( xml != null ) {
-            NodeList nodes = method.parseXML(xml).getElementsByTagName("VApp");
+            Document doc = method.parseXML(xml);
+            String docElementTagName = doc.getDocumentElement().getTagName();
+            String nsString = "";
+            if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+            NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
 
             if( nodes.getLength() < 1 ) {
-                nodes = method.parseXML(xml).getElementsByTagName("Vm");
+                nodes = doc.getElementsByTagName(nsString + "Vm");
             }
             for( int i=0; i<nodes.getLength(); i++ ) {
                 NodeList links = nodes.item(i).getChildNodes();
 
                 for( int j=0; j<links.getLength(); j++ ) {
                     Node node = links.item(j);
+                    if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( node.getNodeName().equalsIgnoreCase("Link") && node.hasAttributes() ) {
+                    if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
                         Node rel = node.getAttributes().getNamedItem("rel");
 
                         if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("undeploy") ) {
