@@ -141,21 +141,27 @@ public class HybridVLANSupport extends DefunctVLAN {
                 String xml = method.get("vdc", dc.getProviderDataCenterId());
 
                 if( xml != null && !xml.equals("") ) {
-                    NodeList vdcs = method.parseXML(xml).getElementsByTagName("Vdc");
+                    Document doc = method.parseXML(xml);
+                    String docElementTagName = doc.getDocumentElement().getTagName();
+                    String nsString = "";
+                    if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                    NodeList vdcs = doc.getElementsByTagName(nsString + "Vdc");
 
                     if( vdcs.getLength() > 0 ) {
                         NodeList attributes = vdcs.item(0).getChildNodes();
 
                         for( int i=0; i<attributes.getLength(); i++ ) {
                             Node attribute = attributes.item(i);
+                            if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+                            else nsString = "";
 
-                            if( attribute.getNodeName().equalsIgnoreCase("AvailableNetworks") && attribute.hasChildNodes() ) {
+                            if( attribute.getNodeName().equalsIgnoreCase(nsString + "AvailableNetworks") && attribute.hasChildNodes() ) {
                                 NodeList resources = attribute.getChildNodes();
 
                                 for( int j=0; j<resources.getLength(); j++ ) {
                                     Node resource = resources.item(j);
 
-                                    if( resource.getNodeName().equalsIgnoreCase("Network") && resource.hasAttributes() ) {
+                                    if( resource.getNodeName().equalsIgnoreCase(nsString + "Network") && resource.hasAttributes() ) {
                                         Node href = resource.getAttributes().getNamedItem("href");
 
                                         VLAN vlan = toVlan(dc.getProviderDataCenterId(), ((vCloud) getProvider()).toID(href.getNodeValue().trim()));
@@ -186,18 +192,22 @@ public class HybridVLANSupport extends DefunctVLAN {
             return null;
         }
         Document doc = method.parseXML(xml);
-        NodeList nets = doc.getElementsByTagName("OrgVdcNetwork");
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList nets = doc.getElementsByTagName(nsString + "OrgVdcNetwork");
 
         if( nets.getLength() < 1 ) {
-            nets = doc.getElementsByTagName("OrgNetwork");
+            nets = doc.getElementsByTagName(nsString + "OrgNetwork");
             if( nets.getLength() < 1 ) {
-                nets = doc.getElementsByTagName("Network");
+                nets = doc.getElementsByTagName(nsString + "Network");
                 if( nets.getLength() < 1 ) {
                     return null;
                 }
             }
         }
         Node netNode = nets.item(0);
+        if(netNode.getNodeName().contains(":"))nsString = netNode.getNodeName().substring(0, netNode.getNodeName().indexOf(":") + 1);
         NodeList attributes = netNode.getChildNodes();
         VLAN vlan = new VLAN();
 
@@ -219,7 +229,7 @@ public class HybridVLANSupport extends DefunctVLAN {
             vlan.setCurrentState(toState(n.getNodeValue().trim()));
         }
         */
-        n = netNode.getAttributes().getNamedItem("name");
+        n = netNode.getAttributes().getNamedItem(nsString + "name");
         if( n != null ) {
             vlan.setName(n.getNodeValue().trim());
             vlan.setDescription(n.getNodeValue().trim());
@@ -233,25 +243,27 @@ public class HybridVLANSupport extends DefunctVLAN {
 
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attribute = attributes.item(i);
+            if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+            else nsString = "";
 
-            if( attribute.getNodeName().equals("Description") && attribute.hasChildNodes() ) {
+            if( attribute.getNodeName().equals(nsString + "Description") && attribute.hasChildNodes() ) {
                 shared = attribute.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
             }
-            else if( attribute.getNodeName().equals("IsShared") && attribute.hasChildNodes() ) {
+            else if( attribute.getNodeName().equals(nsString + "IsShared") && attribute.hasChildNodes() ) {
                 vlan.setDescription(attribute.getFirstChild().getNodeValue().trim());
             }
-            else if( attribute.getNodeName().equals("Features") && attribute.hasChildNodes() ) {
+            else if( attribute.getNodeName().equals(nsString + "Features") && attribute.hasChildNodes() ) {
                 NodeList list = attribute.getChildNodes();
 
                 for( int j=0; j<list.getLength(); j++ ) {
                     Node feature = list.item(j);
 
-                    if( feature.getNodeName().equalsIgnoreCase("FenceMode") && feature.hasChildNodes() ) {
+                    if( feature.getNodeName().equalsIgnoreCase(nsString + "FenceMode") && feature.hasChildNodes() ) {
                         fenceMode = feature.getFirstChild().getNodeValue().trim();
                     }
                 }
             }
-            else if( attribute.getNodeName().equals("Configuration") && attribute.hasChildNodes() ) {
+            else if( attribute.getNodeName().equals(nsString + "Configuration") && attribute.hasChildNodes() ) {
                 NodeList scopesList = attribute.getChildNodes();
                 String[] dns = new String[10];
                 String ipStart = null;
@@ -261,14 +273,16 @@ public class HybridVLANSupport extends DefunctVLAN {
 
                 for( int j=0; j<scopesList.getLength(); j++ ) {
                     Node scopesNode = scopesList.item(j);
+                    if(scopesNode.getNodeName().contains(":"))nsString = scopesNode.getNodeName().substring(0, scopesNode.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( scopesNode.getNodeName().equalsIgnoreCase("FenceMode") && scopesNode.hasChildNodes() ) {
+                    if( scopesNode.getNodeName().equalsIgnoreCase(nsString + "FenceMode") && scopesNode.hasChildNodes() ) {
                         fenceMode = scopesNode.getFirstChild().getNodeValue().trim();
                     }
-                    else if( (scopesNode.getNodeName().equalsIgnoreCase("IpScope") || scopesNode.getNodeName().equalsIgnoreCase("IpScopes")) && scopesNode.hasChildNodes() ) {
+                    else if( (scopesNode.getNodeName().equalsIgnoreCase(nsString + "IpScope") || scopesNode.getNodeName().equalsIgnoreCase(nsString + "IpScopes")) && scopesNode.hasChildNodes() ) {
                         Node scope = null;
 
-                        if( scopesNode.getNodeName().equalsIgnoreCase("IpScope") ) {
+                        if( scopesNode.getNodeName().equalsIgnoreCase(nsString + "IpScope") ) {
                             scope = scopesNode;
                         }
                         else {
@@ -276,8 +290,10 @@ public class HybridVLANSupport extends DefunctVLAN {
 
                             for( int k=0; k<scopes.getLength(); k++ ) {
                                 Node node = scopes.item(k);
+                                if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                                else nsString = "";
 
-                                if( node.getNodeName().equalsIgnoreCase("IpScope") ) {
+                                if( node.getNodeName().equalsIgnoreCase(nsString + "IpScope") ) {
                                     scope = node;
                                     break;
                                 }
@@ -288,20 +304,22 @@ public class HybridVLANSupport extends DefunctVLAN {
 
                             for( int l=0; l<saList.getLength(); l++ ) {
                                 Node sa = saList.item(l);
+                                if(sa.getNodeName().contains(":"))nsString = sa.getNodeName().substring(0, sa.getNodeName().indexOf(":") + 1);
+                                else nsString = "";
 
-                                if( sa.getNodeName().equalsIgnoreCase("Gateway") && sa.hasChildNodes() ) {
+                                if( sa.getNodeName().equalsIgnoreCase(nsString + "Gateway") && sa.hasChildNodes() ) {
                                     gateway = sa.getFirstChild().getNodeValue().trim();
                                 }
-                                else if( sa.getNodeName().equalsIgnoreCase("Netmask") && sa.hasChildNodes() ) {
+                                else if( sa.getNodeName().equalsIgnoreCase(nsString + "Netmask") && sa.hasChildNodes() ) {
                                     netmask = sa.getFirstChild().getNodeValue().trim();
                                 }
-                                else if( sa.getNodeName().equalsIgnoreCase("DnsSuffix") && sa.hasChildNodes() ) {
+                                else if( sa.getNodeName().equalsIgnoreCase(nsString + "DnsSuffix") && sa.hasChildNodes() ) {
                                     domain = sa.getFirstChild().getNodeValue().trim();
                                 }
-                                else if( sa.getNodeName().startsWith("Dns") && sa.hasChildNodes() ) {
+                                else if( sa.getNodeName().startsWith(nsString + "Dns") && sa.hasChildNodes() ) {
                                     String ns = sa.getFirstChild().getNodeValue().trim();
 
-                                    if( sa.getNodeName().equals("Dns") ) {
+                                    if( sa.getNodeName().equals(ns + "Dns") ) {
                                         dns[0] = ns;
                                     }
                                     else {
@@ -320,31 +338,33 @@ public class HybridVLANSupport extends DefunctVLAN {
                                         }
                                     }
                                 }
-                                else if( sa.getNodeName().equalsIgnoreCase("IsEnabled") && sa.hasChildNodes() ) {
+                                else if( sa.getNodeName().equalsIgnoreCase(nsString + "IsEnabled") && sa.hasChildNodes() ) {
                                     enabled = sa.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
                                 }
-                                else if( sa.getNodeName().equalsIgnoreCase("IpRanges") && sa.hasChildNodes() ) {
+                                else if( sa.getNodeName().equalsIgnoreCase(nsString + "IpRanges") && sa.hasChildNodes() ) {
                                     NodeList rangesList = sa.getChildNodes();
 
                                     for( int m=0; m<rangesList.getLength(); m++ ) {
                                         Node ranges = rangesList.item(m);
+                                        if(ranges.getNodeName().contains(":"))nsString = ranges.getNodeName().substring(0, ranges.getNodeName().indexOf(":") + 1);
 
-                                        if( ranges.getNodeName().equalsIgnoreCase("IpRanges") && ranges.hasChildNodes() ) {
+                                        if( ranges.getNodeName().equalsIgnoreCase(nsString + "IpRanges") && ranges.hasChildNodes() ) {
                                             NodeList rangeList = ranges.getChildNodes();
 
                                             for( int o=0; o<rangeList.getLength(); o++ ) {
                                                 Node range = rangeList.item(o);
+                                                if(range.getNodeName().contains(":"))nsString = range.getNodeName().substring(0, range.getNodeName().indexOf(":") + 1);
 
-                                                if( range.getNodeName().equalsIgnoreCase("IpRange") && range.hasChildNodes() ) {
+                                                if( range.getNodeName().equalsIgnoreCase(nsString + "IpRange") && range.hasChildNodes() ) {
                                                     NodeList addresses = range.getChildNodes();
 
                                                     for( int p=0; p<addresses.getLength(); p++ ) {
                                                         Node address = addresses.item(p);
 
-                                                        if( address.getNodeName().equalsIgnoreCase("StartAddress") && address.hasChildNodes() ) {
+                                                        if( address.getNodeName().equalsIgnoreCase(nsString + "StartAddress") && address.hasChildNodes() ) {
                                                             ipStart = address.getFirstChild().getNodeValue().trim();
                                                         }
-                                                        else if( address.getNodeName().equalsIgnoreCase("EndAddress") && address.hasChildNodes() ) {
+                                                        else if( address.getNodeName().equalsIgnoreCase(nsString + "EndAddress") && address.hasChildNodes() ) {
                                                             ipEnd = address.getFirstChild().getNodeValue().trim();
                                                         }
                                                     }
@@ -356,10 +376,10 @@ public class HybridVLANSupport extends DefunctVLAN {
                             }
                         }
                     }
-                    else if( attribute.getNodeName().equalsIgnoreCase("Gateway") && attribute.hasChildNodes() ) {
+                    else if( attribute.getNodeName().equalsIgnoreCase(nsString + "Gateway") && attribute.hasChildNodes() ) {
                         gateway = attribute.getFirstChild().getNodeValue().trim();
                     }
-                    else if( attribute.getNodeName().equalsIgnoreCase("Netmask") && attribute.hasChildNodes() ) {
+                    else if( attribute.getNodeName().equalsIgnoreCase(nsString + "Netmask") && attribute.hasChildNodes() ) {
                         netmask = attribute.getFirstChild().getNodeValue().trim();
                     }
                 }
