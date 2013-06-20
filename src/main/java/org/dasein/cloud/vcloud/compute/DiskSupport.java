@@ -22,6 +22,7 @@ import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
 import org.dasein.util.CalendarWrapper;
 import org.dasein.util.uom.storage.*;
+import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
@@ -189,7 +190,11 @@ public class DiskSupport implements VolumeSupport {
                 throw new CloudException("No error, but no volume");
             }
 
-            NodeList disks = method.parseXML(response).getElementsByTagName("Disk");
+            Document doc = method.parseXML(response);
+            String docElementTagName = doc.getDocumentElement().getTagName();
+            String nsString = "";
+            if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+            NodeList disks = doc.getElementsByTagName(nsString + "Disk");
 
             if( disks.getLength() < 1 ) {
                 throw new CloudException("No error, but no volume");
@@ -359,21 +364,29 @@ public class DiskSupport implements VolumeSupport {
                 String xml = method.get("vdc", dc.getProviderDataCenterId());
 
                 if( xml != null && !xml.equals("") ) {
-                    NodeList vdcs = method.parseXML(xml).getElementsByTagName("Vdc");
+                    Document doc = method.parseXML(xml);
+                    String docElementTagName = doc.getDocumentElement().getTagName();
+                    String nsString = "";
+                    if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                    NodeList vdcs = doc.getElementsByTagName(nsString + "Vdc");
 
                     if( vdcs.getLength() > 0 ) {
                         NodeList attributes = vdcs.item(0).getChildNodes();
 
                         for( int i=0; i<attributes.getLength(); i++ ) {
                             Node attribute = attributes.item(i);
+                            if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+                            else nsString = "";
 
-                            if( attribute.getNodeName().equalsIgnoreCase("ResourceEntities") && attribute.hasChildNodes() ) {
+                            if( attribute.getNodeName().equalsIgnoreCase(nsString + "ResourceEntities") && attribute.hasChildNodes() ) {
                                 NodeList resources = attribute.getChildNodes();
 
                                 for( int j=0; j<resources.getLength(); j++ ) {
                                     Node resource = resources.item(j);
+                                    if(resource.getNodeName().contains(":"))nsString = resource.getNodeName().substring(0, resource.getNodeName().indexOf(":") + 1);
+                                    else nsString = "";
 
-                                    if( resource.getNodeName().equalsIgnoreCase("ResourceEntity") && resource.hasAttributes() ) {
+                                    if( resource.getNodeName().equalsIgnoreCase(nsString + "ResourceEntity") && resource.hasAttributes() ) {
                                         Node type = resource.getAttributes().getNamedItem("type");
 
                                         if( type != null && type.getNodeValue().equals(method.getMediaTypeForDisk()) ) {
@@ -455,7 +468,11 @@ public class DiskSupport implements VolumeSupport {
         if( xml == null || xml.length() < 1 ) {
             return null;
         }
-        NodeList disks = method.parseXML(xml).getElementsByTagName("Disk");
+        Document doc = method.parseXML(xml);
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList disks = doc.getElementsByTagName(nsString + "Disk");
 
         if( disks.getLength() < 1 ) {
             return null;
@@ -487,7 +504,7 @@ public class DiskSupport implements VolumeSupport {
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attribute = attributes.item(i);
 
-            if( attribute.getNodeName().equalsIgnoreCase("Description") && attribute.hasChildNodes() ) {
+            if( attribute.getNodeName().equalsIgnoreCase(nsString + "Description") && attribute.hasChildNodes() ) {
                 volume.setDescription(attribute.getFirstChild().getNodeValue().trim());
             }
         }
@@ -495,7 +512,11 @@ public class DiskSupport implements VolumeSupport {
             xml = method.get("disk", volumeId + "/attachedVms");
 
             if( xml != null && !xml.equals("") ) {
-                NodeList vms = method.parseXML(xml).getElementsByTagName("VmReference");
+                doc = method.parseXML(xml);
+                docElementTagName = doc.getDocumentElement().getTagName();
+                nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                NodeList vms = doc.getElementsByTagName(nsString + "VmReference");
 
                 if( vms.getLength() > 0 ) {
                     Node vm = vms.item(0);

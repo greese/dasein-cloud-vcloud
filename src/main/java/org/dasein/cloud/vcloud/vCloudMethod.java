@@ -317,7 +317,11 @@ public class vCloudMethod {
                 vCloudException.Data data = null;
 
                 if( xml != null && !xml.equals("") ) {
-                    NodeList errors = parseXML(xml).getElementsByTagName("Error");
+                    Document doc = parseXML(xml);
+                    String docElementTagName = doc.getDocumentElement().getTagName();
+                    String nsString = "";
+                    if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                    NodeList errors = doc.getElementsByTagName(nsString + "Error");
 
                     if( errors.getLength() > 0 ) {
                         data = vCloudException.parseException(code, errors.item(0));
@@ -339,7 +343,11 @@ public class vCloudMethod {
         if( xml == null ) {
             throw new CloudException("No content from org URL");
         }
-        NodeList orgList = parseXML(xml).getElementsByTagName("Org");
+        Document doc = parseXML(xml);
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList orgList = doc.getElementsByTagName(nsString + "Org");
 
         for( int i=0; i<orgList.getLength(); i++ ) {
             Node orgNode = orgList.item(i);
@@ -594,7 +602,11 @@ public class vCloudMethod {
                         vCloudException.Data data = null;
 
                         if( body != null && !body.equals("") ) {
-                            NodeList errors = parseXML(body).getElementsByTagName("Error");
+                            Document doc = parseXML(body);
+                            String docElementTagName = doc.getDocumentElement().getTagName();
+                            String nsString = "";
+                            if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                            NodeList errors = doc.getElementsByTagName(nsString + "Error");
 
                             if( errors.getLength() > 0 ) {
                                 data = vCloudException.parseException(status.getStatusCode(), errors.item(0));
@@ -611,8 +623,8 @@ public class vCloudMethod {
                 if( org.endpoint == null ) {
                     throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), "No Org", "No org was identified for " + ctx.getAccountNumber());
                 }
-                cache.put(ctx, Collections.singletonList(org));
                 loadVDCs(org);
+                cache.put(ctx, Collections.singletonList(org));
                 return org;
             }
             finally {
@@ -712,7 +724,11 @@ public class vCloudMethod {
                     vCloudException.Data data = null;
 
                     if( xml != null && !xml.equals("") ) {
-                        NodeList errors = parseXML(xml).getElementsByTagName("Error");
+                        Document doc = parseXML(xml);
+                        String docElementTagName = doc.getDocumentElement().getTagName();
+                        String nsString = "";
+                        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                        NodeList errors = doc.getElementsByTagName(nsString + "Error");
 
                         if( errors.getLength() > 0 ) {
                             data = vCloudException.parseException(code, errors.item(0));
@@ -868,7 +884,11 @@ public class vCloudMethod {
                     vCloudException.Data data = null;
 
                     if( xml != null && !xml.equals("") ) {
-                        NodeList errors = parseXML(xml).getElementsByTagName("Error");
+                        Document doc = parseXML(xml);
+                        String docElementTagName = doc.getDocumentElement().getTagName();
+                        String nsString = "";
+                        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                        NodeList errors = doc.getElementsByTagName(nsString + "Error");
 
                         if( errors.getLength() > 0 ) {
                             data = vCloudException.parseException(code, errors.item(0));
@@ -1096,7 +1116,11 @@ public class vCloudMethod {
         if( xml == null ) {
             return id;
         }
-        NodeList orgs = parseXML(xml).getElementsByTagName("Org");
+        Document doc = parseXML(xml);
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList orgs = doc.getElementsByTagName(nsString + "Org");
 
         if( orgs.getLength() < 1 ) {
             return id;
@@ -1288,7 +1312,11 @@ public class vCloudMethod {
                 vCloudException.Data data = null;
 
                 if( xml != null && !xml.equals("") ) {
-                    NodeList errors = parseXML(xml).getElementsByTagName("Error");
+                    Document doc = parseXML(xml);
+                    String docElementTagName = doc.getDocumentElement().getTagName();
+                    String nsString = "";
+                    if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                    NodeList errors = doc.getElementsByTagName(nsString + "Error");
 
                     if( errors.getLength() > 0 ) {
                         data = vCloudException.parseException(status.getStatusCode(), errors.item(0));
@@ -1340,7 +1368,11 @@ public class vCloudMethod {
         String xml = get("vdc", id);
 
         if( xml != null ) {
-            NodeList vdcs = parseXML(xml).getElementsByTagName("Vdc");
+            Document doc = parseXML(xml);
+            String docElementTagName = doc.getDocumentElement().getTagName();
+            String nsString = "";
+            if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+            NodeList vdcs = doc.getElementsByTagName(nsString + "Vdc");
 
             if( vdcs.getLength() < 1 ) {
                 return;
@@ -1349,8 +1381,10 @@ public class vCloudMethod {
 
             for( int i=0; i<attributes.getLength(); i++ ) {
                 Node attribute = attributes.item(i);
+                if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+                else nsString = "";
 
-                if( attribute.getNodeName().equalsIgnoreCase("Link") && attribute.hasAttributes() ) {
+                if( attribute.getNodeName().equalsIgnoreCase(nsString + "Link") && attribute.hasAttributes() ) {
                     Node rel = attribute.getAttributes().getNamedItem("rel");
 
                     if( rel.getNodeValue().trim().equalsIgnoreCase("add") ) {
@@ -1362,7 +1396,7 @@ public class vCloudMethod {
                         }
                     }
                 }
-                else if( attribute.getNodeName().equalsIgnoreCase("VmQuota") && attribute.hasChildNodes() ) {
+                else if( attribute.getNodeName().equalsIgnoreCase(nsString + "VmQuota") && attribute.hasChildNodes() ) {
                     try {
                         vdc.vmQuota = Integer.parseInt(attribute.getFirstChild().getNodeValue().trim());
                     }
@@ -1370,7 +1404,7 @@ public class vCloudMethod {
                         // ignore
                     }
                 }
-                else if( attribute.getNodeName().equalsIgnoreCase("NetworkQuota") && attribute.hasChildNodes() ) {
+                else if( attribute.getNodeName().equalsIgnoreCase(nsString + "NetworkQuota") && attribute.hasChildNodes() ) {
                     try {
                         vdc.networkQuota = Integer.parseInt(attribute.getFirstChild().getNodeValue().trim());
                     }
@@ -1378,7 +1412,7 @@ public class vCloudMethod {
                         // ignore
                     }
                 }
-                else if( attribute.getNodeName().equalsIgnoreCase("IsEnabled") && attribute.hasChildNodes() ) {
+                else if( attribute.getNodeName().equalsIgnoreCase(nsString + "IsEnabled") && attribute.hasChildNodes() ) {
                     boolean enabled = attribute.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true");
 
                     if( !enabled ) {
@@ -1521,7 +1555,11 @@ public class vCloudMethod {
                 vCloudException.Data data = null;
 
                 if( xml != null && !xml.equals("") ) {
-                    NodeList errors = parseXML(xml).getElementsByTagName("Error");
+                    Document doc = parseXML(xml);
+                    String docElementTagName = doc.getDocumentElement().getTagName();
+                    String nsString = "";
+                    if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                    NodeList errors = doc.getElementsByTagName(nsString + "Error");
 
                     if( errors.getLength() > 0 ) {
                         data = vCloudException.parseException(status.getStatusCode(), errors.item(0));
@@ -1581,7 +1619,11 @@ public class vCloudMethod {
     }
 
     public void parseMetaData(@Nonnull Taggable resource, @Nonnull String xml) throws CloudException, InternalException {
-        NodeList md = parseXML(xml).getElementsByTagName("MetadataEntry");
+        Document doc = parseXML(xml);
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList md = doc.getElementsByTagName(nsString + "MetadataEntry");
 
         for( int i=0; i<md.getLength(); i++ ) {
             Node entry = md.item(i);
@@ -1592,22 +1634,24 @@ public class vCloudMethod {
 
                 for( int j=0; j<parts.getLength(); j++ ) {
                     Node part = parts.item(j);
+                    if(part.getNodeName().contains(":"))nsString = part.getNodeName().substring(0, part.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( part.getNodeName().equalsIgnoreCase("Key") && part.hasChildNodes() ) {
+                    if( part.getNodeName().equalsIgnoreCase(nsString + "Key") && part.hasChildNodes() ) {
                         key = part.getFirstChild().getNodeValue().trim();
                     }
-                    else if( part.getNodeName().equalsIgnoreCase("TypedValue") && part.hasChildNodes() ) {
+                    else if( part.getNodeName().equalsIgnoreCase(nsString + "TypedValue") && part.hasChildNodes() ) {
                         NodeList values = part.getChildNodes();
 
                         for( int k=0; k<values.getLength(); k++ ) {
                             Node v = values.item(k);
 
-                            if( v.getNodeName().equalsIgnoreCase("Value") && v.hasChildNodes() ) {
+                            if( v.getNodeName().equalsIgnoreCase(nsString + "Value") && v.hasChildNodes() ) {
                                 value = v.getFirstChild().getNodeValue().trim();
                             }
                         }
                     }
-                    else if( part.getNodeName().equalsIgnoreCase("Value") && part.hasChildNodes() ) {
+                    else if( part.getNodeName().equalsIgnoreCase(nsString + "Value") && part.hasChildNodes() ) {
                         value = part.getFirstChild().getNodeValue().trim();
                     }
                 }
@@ -1814,7 +1858,11 @@ public class vCloudMethod {
                     vCloudException.Data data = null;
 
                     if( xml != null && !xml.equals("") ) {
-                        NodeList errors = parseXML(xml).getElementsByTagName("Error");
+                        Document doc = parseXML(xml);
+                        String docElementTagName = doc.getDocumentElement().getTagName();
+                        String nsString = "";
+                        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                        NodeList errors = doc.getElementsByTagName(nsString + "Error");
 
                         if( errors.getLength() > 0 ) {
                             data = vCloudException.parseException(code, errors.item(0));
@@ -1986,7 +2034,11 @@ public class vCloudMethod {
                     vCloudException.Data data = null;
 
                     if( xml != null && !xml.equals("") ) {
-                        NodeList errors = parseXML(xml).getElementsByTagName("Error");
+                        Document doc = parseXML(xml);
+                        String docElementTagName = doc.getDocumentElement().getTagName();
+                        String nsString = "";
+                        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                        NodeList errors = doc.getElementsByTagName(nsString + "Error");
 
                         if( errors.getLength() > 0 ) {
                             data = vCloudException.parseException(code, errors.item(0));
@@ -2074,7 +2126,11 @@ public class vCloudMethod {
             NodeList tasks;
 
             try {
-                tasks = parseXML(xmlTask).getElementsByTagName("Task");
+                Document doc = parseXML(xmlTask);
+                String docElementTagName = doc.getDocumentElement().getTagName();
+                String nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                tasks = doc.getElementsByTagName(nsString + "Task");
             }
             catch( Throwable ignore ) {
                 return;

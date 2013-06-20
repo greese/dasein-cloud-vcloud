@@ -243,7 +243,11 @@ public class TemplateSupport implements MachineImageSupport {
 
             method.waitFor(response);
             if( !response.equals("") ) {
-                NodeList matches = method.parseXML(response).getElementsByTagName("AdminCatalog");
+                Document doc = method.parseXML(response);
+                String docElementTagName = doc.getDocumentElement().getTagName();
+                String nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                NodeList matches = doc.getElementsByTagName(nsString + "AdminCatalog");
 
                 for( int i=0; i<matches.getLength(); i++ ) {
                     Node m = matches.item(i);
@@ -286,7 +290,10 @@ public class TemplateSupport implements MachineImageSupport {
             return null;
         }
         Document doc = method.parseXML(xml);
-        NodeList cNodes = doc.getElementsByTagName("Catalog");
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList cNodes = doc.getElementsByTagName(nsString + "Catalog");
 
         for( int i=0; i<cNodes.getLength(); i++ ) {
             Node cnode = cNodes.item(i);
@@ -304,11 +311,13 @@ public class TemplateSupport implements MachineImageSupport {
 
                 for( int j=0; j<attributes.getLength(); j++ ) {
                     Node attribute = attributes.item(j);
+                    if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+                    else nsString = "";
 
-                    if( attribute.getNodeName().equalsIgnoreCase("IsPublished") ) {
+                    if( attribute.getNodeName().equalsIgnoreCase(nsString + "IsPublished") ) {
                         p = (attribute.hasChildNodes() && attribute.getFirstChild().getNodeValue().trim().equalsIgnoreCase("true"));
                     }
-                    else if( attribute.getNodeName().equalsIgnoreCase("Link") && attribute.hasAttributes() ) {
+                    else if( attribute.getNodeName().equalsIgnoreCase(nsString + "Link") && attribute.hasAttributes() ) {
                         Node rel = attribute.getAttributes().getNamedItem("rel");
 
                         if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("up") ) {
@@ -407,7 +416,10 @@ public class TemplateSupport implements MachineImageSupport {
             else {
                 ArrayList<Catalog> list = new ArrayList<Catalog>();
                 Document doc = method.parseXML(xml);
-                NodeList links = doc.getElementsByTagName("Link");
+                String docElementTagName = doc.getDocumentElement().getTagName();
+                String nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                NodeList links = doc.getElementsByTagName(nsString + "Link");
 
                 for( int i=0; i<links.getLength(); i++ ) {
                     Node link = links.item(i);
@@ -450,7 +462,10 @@ public class TemplateSupport implements MachineImageSupport {
             else {
                 ArrayList<Catalog> list = new ArrayList<Catalog>();
                 Document doc = method.parseXML(xml);
-                NodeList links = doc.getElementsByTagName("Link");
+                String docElementTagName = doc.getDocumentElement().getTagName();
+                String nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                NodeList links = doc.getElementsByTagName(nsString + "Link");
 
                 for( int i=0; i<links.getLength(); i++ ) {
                     Node link = links.item(i);
@@ -497,7 +512,10 @@ public class TemplateSupport implements MachineImageSupport {
                     continue;
                 }
                 Document doc = method.parseXML(xml);
-                NodeList cNodes = doc.getElementsByTagName("Catalog");
+                String docElementTagName = doc.getDocumentElement().getTagName();
+                String nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                NodeList cNodes = doc.getElementsByTagName(nsString + "Catalog");
 
                 for( int i=0; i<cNodes.getLength(); i++ ) {
                     Node cnode = cNodes.item(i);
@@ -507,14 +525,18 @@ public class TemplateSupport implements MachineImageSupport {
 
                         for( int j=0; j<items.getLength(); j++ ) {
                             Node wrapper = items.item(j);
+                            if(wrapper.getNodeName().contains(":"))nsString = wrapper.getNodeName().substring(0, wrapper.getNodeName().indexOf(":") + 1);
+                            else nsString = "";
 
-                            if( wrapper.getNodeName().equalsIgnoreCase("CatalogItems") && wrapper.hasChildNodes() ) {
+                            if( wrapper.getNodeName().equalsIgnoreCase(nsString + "CatalogItems") && wrapper.hasChildNodes() ) {
                                 NodeList entries = wrapper.getChildNodes();
 
                                 for( int k=0; k<entries.getLength(); k++ ) {
                                     Node item = entries.item(k);
+                                    if(item.getNodeName().contains(":"))nsString = item.getNodeName().substring(0, item.getNodeName().indexOf(":") + 1);
+                                    else nsString = "";
 
-                                    if( item.getNodeName().equalsIgnoreCase("CatalogItem") && item.hasAttributes() ) {
+                                    if( item.getNodeName().equalsIgnoreCase(nsString + "CatalogItem") && item.hasAttributes() ) {
                                         Node href = item.getAttributes().getNamedItem("href");
 
                                         if( href != null ) {
@@ -559,7 +581,10 @@ public class TemplateSupport implements MachineImageSupport {
             return null;
         }
         Document doc = method.parseXML(xml);
-        NodeList items = doc.getElementsByTagName("CatalogItem");
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList items = doc.getElementsByTagName(nsString + "CatalogItem");
 
         if( items.getLength() < 1 ) {
             return null;
@@ -584,7 +609,7 @@ public class TemplateSupport implements MachineImageSupport {
             for( int i=0; i<entries.getLength(); i++ ) {
                 Node entry = entries.item(i);
 
-                if( entry.getNodeName().equalsIgnoreCase("description") && entry.hasChildNodes() ) {
+                if( entry.getNodeName().equalsIgnoreCase(nsString + "description") && entry.hasChildNodes() ) {
                     String d = entry.getFirstChild().getNodeValue().trim();
 
                     if( d.length() > 0 ) {
@@ -594,7 +619,7 @@ public class TemplateSupport implements MachineImageSupport {
                         }
                     }
                 }
-                else if( entry.getNodeName().equalsIgnoreCase("entity") && entry.hasAttributes() ) {
+                else if( entry.getNodeName().equalsIgnoreCase(nsString + "entity") && entry.hasAttributes() ) {
                     Node href = entry.getAttributes().getNamedItem("href");
 
                     if( href != null ) {
@@ -619,7 +644,10 @@ public class TemplateSupport implements MachineImageSupport {
             return null;
         }
         Document doc = method.parseXML(xml);
-        NodeList templates = doc.getElementsByTagName("VAppTemplate");
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList templates = doc.getElementsByTagName(nsString + "VAppTemplate");
 
         if( templates.getLength() < 1 ) {
             return null;
@@ -646,7 +674,9 @@ public class TemplateSupport implements MachineImageSupport {
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attribute = attributes.item(i);
 
-            if( attribute.getNodeName().equalsIgnoreCase("description") && image.getDescription() == null && attribute.hasChildNodes() ) {
+            if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+
+            if( attribute.getNodeName().equalsIgnoreCase(nsString + "description") && image.getDescription() == null && attribute.hasChildNodes() ) {
                 String d = attribute.getFirstChild().getNodeValue().trim();
 
                 if( d.length() > 0 ) {
@@ -656,13 +686,13 @@ public class TemplateSupport implements MachineImageSupport {
                     }
                 }
             }
-            else if( attribute.getNodeName().equalsIgnoreCase("children") && attribute.hasChildNodes() ) {
+            else if( attribute.getNodeName().equalsIgnoreCase(nsString + "children") && attribute.hasChildNodes() ) {
                 NodeList children = attribute.getChildNodes();
 
                 for( int j=0; j<children.getLength(); j++ ) {
                     Node child = children.item(j);
 
-                    if( child.getNodeName().equalsIgnoreCase("vm") && child.hasChildNodes() ) {
+                    if( child.getNodeName().equalsIgnoreCase(nsString + "vm") && child.hasChildNodes() ) {
                         Node childHref = child.getAttributes().getNamedItem("href");
 
                         if( childHref != null ) {
@@ -672,14 +702,15 @@ public class TemplateSupport implements MachineImageSupport {
 
                         for( int k=0; k<vmAttrs.getLength(); k++ ) {
                             Node vmAttr = vmAttrs.item(k);
+                            if(vmAttr.getNodeName().contains(":"))nsString = vmAttr.getNodeName().substring(0, vmAttr.getNodeName().indexOf(":") + 1);
 
-                            if( vmAttr.getNodeName().equalsIgnoreCase("guestcustomizationsection") && vmAttr.hasChildNodes() ) {
+                            if( vmAttr.getNodeName().equalsIgnoreCase(nsString + "guestcustomizationsection") && vmAttr.hasChildNodes() ) {
                                 NodeList custList = vmAttr.getChildNodes();
 
                                 for( int l=0; l<custList.getLength(); l++ ) {
                                     Node cust = custList.item(l);
 
-                                    if( cust.getNodeName().equalsIgnoreCase("computername") && cust.hasChildNodes() ) {
+                                    if( cust.getNodeName().equalsIgnoreCase(nsString + "computername") && cust.hasChildNodes() ) {
                                         String n = cust.getFirstChild().getNodeValue().trim();
 
                                         if( n.length() > 0 ) {
@@ -693,13 +724,13 @@ public class TemplateSupport implements MachineImageSupport {
                                     }
                                 }
                             }
-                            else if( vmAttr.getNodeName().equalsIgnoreCase("ovf:ProductSection") && vmAttr.hasChildNodes() ) {
+                            else if( vmAttr.getNodeName().equalsIgnoreCase(nsString + "ProductSection") && vmAttr.hasChildNodes() ) {
                                 NodeList prdList = vmAttr.getChildNodes();
 
                                 for( int l=0; l<prdList.getLength(); l++ ) {
                                     Node prd = prdList.item(l);
 
-                                    if( prd.getNodeName().equalsIgnoreCase("ovf:Product") && prd.hasChildNodes() ) {
+                                    if( prd.getNodeName().equalsIgnoreCase(nsString + "Product") && prd.hasChildNodes() ) {
                                         String n = prd.getFirstChild().getNodeValue().trim();
 
                                         if( n.length() > 0 ) {
@@ -708,13 +739,13 @@ public class TemplateSupport implements MachineImageSupport {
                                     }
                                 }
                             }
-                            else if( vmAttr.getNodeName().equalsIgnoreCase("ovf:OperatingSystemSection") && vmAttr.hasChildNodes() ) {
+                            else if( vmAttr.getNodeName().equalsIgnoreCase(nsString + "OperatingSystemSection") && vmAttr.hasChildNodes() ) {
                                 NodeList os = vmAttr.getChildNodes();
 
                                 for( int l=0; l<os.getLength(); l++ ) {
                                     Node osdesc = os.item(l);
 
-                                    if( osdesc.getNodeName().equalsIgnoreCase("ovf:Description") && osdesc.hasChildNodes() ) {
+                                    if( osdesc.getNodeName().equalsIgnoreCase(nsString + "Description") && osdesc.hasChildNodes() ) {
                                         String desc = osdesc.getFirstChild().getNodeValue();
 
                                         image.setPlatform(Platform.guess(desc));
@@ -799,7 +830,10 @@ public class TemplateSupport implements MachineImageSupport {
                     continue;
                 }
                 Document doc = method.parseXML(xml);
-                NodeList cNodes = doc.getElementsByTagName("Catalog");
+                String docElementTagName = doc.getDocumentElement().getTagName();
+                String nsString = "";
+                if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+                NodeList cNodes = doc.getElementsByTagName(nsString + "Catalog");
 
                 for( int i=0; i<cNodes.getLength(); i++ ) {
                     Node cnode = cNodes.item(i);
@@ -809,14 +843,18 @@ public class TemplateSupport implements MachineImageSupport {
 
                         for( int j=0; j<items.getLength(); j++ ) {
                             Node wrapper = items.item(j);
+                            if(wrapper.getNodeName().contains(":"))nsString = wrapper.getNodeName().substring(0, wrapper.getNodeName().indexOf(":") + 1);
+                            else nsString = "";
 
-                            if( wrapper.getNodeName().equalsIgnoreCase("CatalogItems") && wrapper.hasChildNodes() ) {
+                            if( wrapper.getNodeName().equalsIgnoreCase(nsString + "CatalogItems") && wrapper.hasChildNodes() ) {
                                 NodeList entries = wrapper.getChildNodes();
 
                                 for( int k=0; k<entries.getLength(); k++ ) {
                                     Node item = entries.item(k);
+                                    if(item.getNodeName().contains(":"))nsString = item.getNodeName().substring(0, item.getNodeName().indexOf(":") + 1);
+                                    else nsString = "";
 
-                                    if( item.getNodeName().equalsIgnoreCase("CatalogItem") && item.hasAttributes() ) {
+                                    if( item.getNodeName().equalsIgnoreCase(nsString + "CatalogItem") && item.hasAttributes() ) {
                                         Node href = item.getAttributes().getNamedItem("href");
 
                                         if( href != null ) {
@@ -1212,7 +1250,7 @@ public class TemplateSupport implements MachineImageSupport {
 
     @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        return false;
+        return cls.equals(ImageClass.MACHINE);
     }
 
     @Override
