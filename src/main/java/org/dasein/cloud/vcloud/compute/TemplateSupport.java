@@ -57,8 +57,11 @@ import org.w3c.dom.NodeList;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Locale;
+import java.util.TimeZone;
 import java.util.TreeSet;
 
 /**
@@ -674,7 +677,12 @@ public class TemplateSupport implements MachineImageSupport {
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attribute = attributes.item(i);
 
-            if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+            if(attribute.getNodeName().contains(":")){
+                nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+            }
+            else{
+                nsString="";
+            }
 
             if( attribute.getNodeName().equalsIgnoreCase(nsString + "description") && image.getDescription() == null && attribute.hasChildNodes() ) {
                 String d = attribute.getFirstChild().getNodeValue().trim();
@@ -759,6 +767,29 @@ public class TemplateSupport implements MachineImageSupport {
                         }
                     }
                 }
+            }
+            else if (attribute.getNodeName().equalsIgnoreCase(nsString + "LeaseSettingsSection") && attribute.hasChildNodes()){
+            	if (logger.isTraceEnabled()){
+            		logger.trace("Checking lease settings for VAppTemplate : " +  image.getName());
+            	}
+            	NodeList children = attribute.getChildNodes();
+                for( int j=0; j<children.getLength(); j++ ) {
+                    Node child = children.item(j);
+                    if( child.getNodeName().equalsIgnoreCase(nsString + "StorageLeaseExpiration") && child.hasChildNodes() ) {
+                    	String expiryDateString = child.getFirstChild().getNodeValue().trim();
+                    	Date expiryDate = vCloud.parseIsoDate(expiryDateString);
+                    	if (expiryDate != null){
+                    		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                    		if (cal.getTimeInMillis() > expiryDate.getTime()){
+                    			if (logger.isTraceEnabled()){
+                    				logger.trace("vAppTemplate " + image.getName() + " has an expired storage lease.");
+                    			}
+                    			return null;
+                    		}
+                    	}
+                    }
+                }
+                
             }
         }
         if( image.getName() == null ) {
