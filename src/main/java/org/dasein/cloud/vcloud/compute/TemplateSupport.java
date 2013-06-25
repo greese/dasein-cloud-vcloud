@@ -327,7 +327,7 @@ public class TemplateSupport extends AbstractImageSupport {
                     return image;
                 }
             }
-            for( MachineImage image : searchPublicImages(null, null, null) ) {
+            for( MachineImage image : searchPublicImages((ImageFilterOptions)null) ) {
                 if( image.getProviderMachineImageId().equals(providerImageId) ) {
                     return image;
                 }
