@@ -623,8 +623,9 @@ public class vCloudMethod {
                 if( org.endpoint == null ) {
                     throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), "No Org", "No org was identified for " + ctx.getAccountNumber());
                 }
-                loadVDCs(org);
+
                 cache.put(ctx, Collections.singletonList(org));
+                loadVDCs(org);
                 return org;
             }
             finally {
@@ -1657,6 +1658,7 @@ public class vCloudMethod {
                 }
                 if( key != null && value != null ) {
                     resource.setTag(key, value);
+                    logger.debug("setting tag: " + key + "=" + value);
                 }
             }
         }
