@@ -359,7 +359,7 @@ public class TemplateSupport implements MachineImageSupport {
                     return image;
                 }
             }
-            for( MachineImage image : searchPublicImages(null, null, null) ) {
+            for( MachineImage image : searchPublicImages("", null, null,ImageClass.MACHINE) ) {
                 if( image.getProviderMachineImageId().equals(providerImageId) ) {
                     return image;
                 }
