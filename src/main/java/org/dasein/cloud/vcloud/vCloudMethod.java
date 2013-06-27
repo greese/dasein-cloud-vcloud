@@ -158,7 +158,30 @@ public class vCloudMethod {
         public Version version;
         public Region region;
         public String url;
-        public Iterable<VDC> vdcs;
+        private volatile Iterable<VDC> _vdcs;
+        public Iterable<VDC> getVdcs() throws InternalException {
+            if (_vdcs != null) {
+                return _vdcs;
+            }
+            // There is a caching+recursion issue with authenticate()
+            int timeout = 4000;
+            while (_vdcs == null) {
+                try {
+                    Thread.sleep(400L);
+                } catch (InterruptedException ignore) {
+                    timeout -= 100L;
+                    continue;
+                }
+                timeout -= 400L;
+                if (timeout <= 0) {
+                    throw new InternalException("Could not populate VDCs");
+                }
+            }
+            return _vdcs;
+        }
+        public void setVdcs(Iterable<VDC> vdcs) {
+            this._vdcs = vdcs;
+        }
     }
 
     static public class Version {
@@ -623,8 +646,8 @@ public class vCloudMethod {
                 if( org.endpoint == null ) {
                     throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), "No Org", "No org was identified for " + ctx.getAccountNumber());
                 }
-                loadVDCs(org);
                 cache.put(ctx, Collections.singletonList(org));
+                loadVDCs(org);
                 return org;
             }
             finally {
@@ -1055,7 +1078,7 @@ public class vCloudMethod {
         return "application/vnd.vmware.vcloud.disk+xml";
     }
 
-    public @Nonnull String getMediaTypeForGuestConnectionSection() {
+    public @Nonnull String getMediaTypeForGuestCustomizationSection() {
         return "application/vnd.vmware.vcloud.guestCustomizationSection+xml";
     }
 
@@ -1075,6 +1098,10 @@ public class vCloudMethod {
         return "application/vnd.vmware.vcloud.orgList+xml";
     }
 
+    public @Nonnull String getMediaTypeForRasdItem() {
+        return "application/vnd.vmware.vcloud.rasdItem+xml";
+    }
+
     public @Nonnull String getMediaTypeForVApp() {
         return "application/vnd.vmware.vcloud.vApp+xml";
     }
@@ -1087,14 +1114,10 @@ public class vCloudMethod {
         return "application/vnd.vmware.vcloud.vdc+xml";
     }
 
-    public @Nonnull String getMediaTypeForVirtualHardwareSection() {
-        return "application/vnd.vmware.vcloud.virtualHardwareSection+xml";
-    }
-
     public int getNetworkQuota() throws CloudException, InternalException {
         int quota =-2;
 
-        for( VDC vdc : authenticate(false).vdcs ) {
+        for( VDC vdc : authenticate(false).getVdcs() ) {
             int q = vdc.networkQuota;
 
             if( q > -1 ) {
@@ -1340,7 +1363,7 @@ public class vCloudMethod {
     public int getVMQuota() throws CloudException, InternalException {
         int quota =-2;
 
-        for( VDC vdc : authenticate(false).vdcs ) {
+        for( VDC vdc : authenticate(false).getVdcs() ) {
             int q = vdc.vmQuota;
 
             if( q > -1 ) {
@@ -1358,7 +1381,7 @@ public class vCloudMethod {
     public Collection<DataCenter> listDataCenters() throws CloudException, InternalException {
         ArrayList<DataCenter> dcs = new ArrayList<DataCenter>();
 
-        for( VDC vdc : authenticate(false).vdcs ) {
+        for( VDC vdc : authenticate(false).getVdcs() ) {
             dcs.add(vdc.dataCenter);
         }
         return dcs;
@@ -1519,7 +1542,7 @@ public class vCloudMethod {
                             }
                         }
                     }
-                    org.vdcs = vdcs;
+                    org.setVdcs(vdcs);
                 }
                 catch( IOException e ) {
                     throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
@@ -1691,7 +1714,7 @@ public class vCloudMethod {
             String endpoint;
             VDC vdc = null;
 
-            for( VDC v : org.vdcs ) {
+            for( VDC v : org.getVdcs() ) {
                 if( vdcId == null ) {
                     vdc = v;
                     break;

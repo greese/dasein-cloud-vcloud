@@ -31,6 +31,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Properties;
 import java.util.TimeZone;
 
@@ -44,7 +45,8 @@ import java.util.TimeZone;
  */
 public class vCloud extends AbstractCloud {
     static private final Logger logger = getLogger(vCloud.class);
-
+    public final static String ISO8601_PATTERN       = "yyy-MM-dd'T'HH:mm:ss.SSSZ";
+    
     static private @Nonnull String getLastItem(@Nonnull String name) {
         int idx = name.lastIndexOf('.');
 
@@ -329,4 +331,32 @@ public class vCloud extends AbstractCloud {
 
         return (getProviderName() + " - " + getCloudName() + (ctx == null ? "" : " [" + ctx.getAccountNumber() + "]"));
     }
+    
+    public static Date parseIsoDate(String isoDateString) {
+		SimpleDateFormat df = new SimpleDateFormat( ISO8601_PATTERN );
+        
+		//handle TimeZone info
+        
+		 if ( isoDateString.endsWith( "Z" ) ) {
+			 isoDateString = isoDateString.substring( 0, isoDateString.length() - 1) + "GMT-00:00";
+	     } 
+		 else {
+			int exclude = 6;
+	        
+	        String first = isoDateString.substring( 0, isoDateString.length() - exclude );
+	        String second = isoDateString.substring( isoDateString.length() - exclude, isoDateString.length() );
+	
+	        isoDateString = first + "GMT" + second;
+	    }
+		df.setTimeZone(TimeZone.getTimeZone("UTC"));
+        Date result = null;
+        
+        try {
+			result = df.parse( isoDateString );
+		} catch (ParseException e) {
+			logger.error("Could not parse date : " + isoDateString + " as a ISO6801 pattern : " + e.getMessage());
+			return null;
+		}
+        return result;
+	}
 }
