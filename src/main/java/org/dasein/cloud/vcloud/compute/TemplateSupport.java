@@ -53,8 +53,11 @@ import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Locale;
+import java.util.TimeZone;
 import java.util.TreeSet;
 
 /**
@@ -324,7 +327,7 @@ public class TemplateSupport extends AbstractImageSupport {
                     return image;
                 }
             }
-            for( MachineImage image : searchPublicImages(null, null, null) ) {
+            for( MachineImage image : searchPublicImages((ImageFilterOptions)null) ) {
                 if( image.getProviderMachineImageId().equals(providerImageId) ) {
                     return image;
                 }
@@ -714,6 +717,29 @@ public class TemplateSupport extends AbstractImageSupport {
                         }
                     }
                 }
+            }
+            else if (attribute.getNodeName().equalsIgnoreCase("LeaseSettingsSection") && attribute.hasChildNodes()){
+            	if (logger.isTraceEnabled()){
+            		logger.trace("Checking lease settings for VAppTemplate : " +  name);
+            	}
+            	NodeList children = attribute.getChildNodes();
+                for( int j=0; j<children.getLength(); j++ ) {
+                    Node child = children.item(j);
+                    if( child.getNodeName().equalsIgnoreCase("StorageLeaseExpiration") && child.hasChildNodes() ) {
+                    	String expiryDateString = child.getFirstChild().getNodeValue().trim();
+                    	Date expiryDate = vCloud.parseIsoDate(expiryDateString);
+                    	if (expiryDate != null){
+                    		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                    		if (cal.getTimeInMillis() > expiryDate.getTime()){
+                    			if (logger.isTraceEnabled()){
+                    				logger.trace("vAppTemplate " + name + " has an expired storage lease.");
+                    			}
+                    			return null;
+                    		}
+                    	}
+                    }
+                }
+                
             }
             else if( attribute.getNodeName().equalsIgnoreCase("datecreated") && attribute.hasChildNodes() ) {
                 createdAt = ((vCloud)getProvider()).parseTime(attribute.getFirstChild().getNodeValue().trim());

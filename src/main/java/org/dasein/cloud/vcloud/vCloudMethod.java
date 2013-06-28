@@ -159,7 +159,30 @@ public class vCloudMethod {
         public Version version;
         public Region region;
         public String url;
-        public Iterable<VDC> vdcs;
+        private volatile Iterable<VDC> _vdcs;
+        public Iterable<VDC> getVdcs() throws InternalException {
+            if (_vdcs != null) {
+                return _vdcs;
+            }
+            // There is a caching+recursion issue with authenticate()
+            int timeout = 4000;
+            while (_vdcs == null) {
+                try {
+                    Thread.sleep(400L);
+                } catch (InterruptedException ignore) {
+                    timeout -= 100L;
+                    continue;
+                }
+                timeout -= 400L;
+                if (timeout <= 0) {
+                    throw new InternalException("Could not populate VDCs");
+                }
+            }
+            return _vdcs;
+        }
+        public void setVdcs(Iterable<VDC> vdcs) {
+            this._vdcs = vdcs;
+        }
     }
 
     static public class Version {
@@ -1009,7 +1032,7 @@ public class vCloudMethod {
     public int getNetworkQuota() throws CloudException, InternalException {
         int quota =-2;
 
-        for( VDC vdc : authenticate(false).vdcs ) {
+        for( VDC vdc : authenticate(false).getVdcs() ) {
             int q = vdc.networkQuota;
 
             if( q > -1 ) {
@@ -1247,7 +1270,7 @@ public class vCloudMethod {
     public int getVMQuota() throws CloudException, InternalException {
         int quota =-2;
 
-        for( VDC vdc : authenticate(false).vdcs ) {
+        for( VDC vdc : authenticate(false).getVdcs() ) {
             int q = vdc.vmQuota;
 
             if( q > -1 ) {
@@ -1265,7 +1288,7 @@ public class vCloudMethod {
     public Collection<DataCenter> listDataCenters() throws CloudException, InternalException {
         ArrayList<DataCenter> dcs = new ArrayList<DataCenter>();
 
-        for( VDC vdc : authenticate(false).vdcs ) {
+        for( VDC vdc : authenticate(false).getVdcs() ) {
             dcs.add(vdc.dataCenter);
         }
         return dcs;
@@ -1420,7 +1443,7 @@ public class vCloudMethod {
                             }
                         }
                     }
-                    org.vdcs = vdcs;
+                    org.setVdcs(vdcs);
                 }
                 catch( IOException e ) {
                     throw new CloudException(CloudErrorType.GENERAL, status.getStatusCode(), status.getReasonPhrase(), e.getMessage());
@@ -1582,7 +1605,7 @@ public class vCloudMethod {
             String endpoint;
             VDC vdc = null;
 
-            for( VDC v : org.vdcs ) {
+            for( VDC v : org.getVdcs() ) {
                 if( vdcId == null ) {
                     vdc = v;
                     break;
