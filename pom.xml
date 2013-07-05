@@ -2,11 +2,11 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-vcloud</artifactId>
-  <version>2013.02.9-SNAPSHOT</version>
+  <version>2013.02.10-SNAPSHOT</version>
   <name>Dasein Cloud vCloud</name>
   <description>Dasein Cloud implementation for the vCloud API</description>
   
-  <url>http://dasein-cloud.sf.net</url>
+  <url>http://github.com/greese/dasein-cloud-vcloud</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
