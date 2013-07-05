@@ -343,21 +343,39 @@ public class vAppSupport extends DefunctVM {
 
             xml.append("<InstantiateVAppTemplateParams xmlns:ovf=\"http://schemas.dmtf.org/ovf/envelope/1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" name=\"").append(withLaunchOptions.getFriendlyName()).append(" Parent vApp\" xmlns=\"http://www.vmware.com/vcloud/v1.5\" deploy=\"false\" powerOn=\"false\">");
             xml.append("<Description>").append(img.getProviderMachineImageId()).append("</Description>");
-            String vlanId = withLaunchOptions.getVlanId();
-            final VLAN vlan;
 
-            if( vlanId != null ) {
-                vlan = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().getVlan(vlanId);
-                if( vlan != null ) {
-                    String vAppTemplateUrl = method.toURL("vAppTemplate", img.getProviderMachineImageId());
-                    xml.append("<Source href=\"").append(vAppTemplateUrl).append("\"/>");
-                }
-                else {
-                    throw new CloudException("Failed to find vlan " + vlanId);
+            String vlanId = withLaunchOptions.getVlanId();
+
+            // If vlanId is not specified, explicitly use default in machine image. If left out,
+            // default is not recognized in vCloud 1.5, error is: VCD entity network "X"
+            // specified for VM "Y" does not exist (even though it does exist)
+            if (vlanId == null || vlanId.trim().isEmpty()) {
+                String defaultVlanName = (String)img.getTag("defaultVlanName");
+                String defaultVlanNameDHCP = (String)img.getTag("defaultVlanNameDHCP");
+                if (defaultVlanName != null && !defaultVlanName.trim().isEmpty()) {
+                    Iterable<VLAN> vlans = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans();
+                    for (VLAN vlan : vlans) {
+                        if (defaultVlanName.equalsIgnoreCase(vlan.getName())) {
+                            vlanId = vlan.getProviderVlanId();
+                        }
+                    }
+                    if (vlanId == null) {
+                        throw new CloudException("Could not locate default vlan '" + defaultVlanName + "'");
+                    }
+                } else if (defaultVlanNameDHCP != null && !defaultVlanNameDHCP.trim().isEmpty()) {
+                    throw new CloudException("No vlan selected and the default is DHCP-based which is not supported");
+                } else {
+                    throw new CloudException("No vlan specified and no default.");
                 }
             }
+
+            final VLAN vlan = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().getVlan(vlanId);
+            if( vlan != null ) {
+                String vAppTemplateUrl = method.toURL("vAppTemplate", img.getProviderMachineImageId());
+                xml.append("<Source href=\"").append(vAppTemplateUrl).append("\"/>");
+            }
             else {
-                throw new CloudException("No vlan specified.");
+                throw new CloudException("Failed to find vlan " + vlanId);
             }
             xml.append("<AllEULAsAccepted>true</AllEULAsAccepted>");
             xml.append("</InstantiateVAppTemplateParams>");
