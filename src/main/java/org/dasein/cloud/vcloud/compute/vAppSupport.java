@@ -497,15 +497,6 @@ public class vAppSupport extends AbstractVMSupport {
                             }
                         }
 
-                        try {
-                            deploy(vappId);
-                        } catch (CloudException e) {
-                            logger.error("Error deploying vApp " + vappId, e);
-                            return;
-                        } catch (InternalException e) {
-                            logger.error("Error deploying vApp " + vappId, e);
-                            return;
-                        }
                         String vAppGetResponse;
                         try {
                             vAppGetResponse = method.get("vApp", vappId);
@@ -697,6 +688,17 @@ public class vAppSupport extends AbstractVMSupport {
                         if( vmId == null ) {
                             logger.error("No virtual machines exist in " + vappId);
                         }
+                        logger.warn("deploying vApp " + vappId);
+                        try {
+                            deploy(vappId);
+                        } catch (CloudException e) {
+                            logger.error("Error deploying vApp " + vappId, e);
+                            return;
+                        } catch (InternalException e) {
+                            logger.error("Error deploying vApp " + vappId, e);
+                            return;
+                        }
+                        logger.warn("starting vApp " + vappId);
                         try {
                             startVapp(vappId, true);
                         } catch (CloudException e) {
