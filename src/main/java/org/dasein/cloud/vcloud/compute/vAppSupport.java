@@ -688,7 +688,6 @@ public class vAppSupport extends AbstractVMSupport {
                         if( vmId == null ) {
                             logger.error("No virtual machines exist in " + vappId);
                         }
-                        logger.warn("deploying vApp " + vappId);
                         try {
                             deploy(vappId);
                         } catch (CloudException e) {
@@ -698,7 +697,6 @@ public class vAppSupport extends AbstractVMSupport {
                             logger.error("Error deploying vApp " + vappId, e);
                             return;
                         }
-                        logger.warn("starting vApp " + vappId);
                         try {
                             startVapp(vappId, true);
                         } catch (CloudException e) {
