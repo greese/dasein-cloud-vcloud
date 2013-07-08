@@ -1145,9 +1145,10 @@ public class vAppSupport extends AbstractVMSupport {
         if( n != null ) {
             vm.setCurrentState(toState(n.getNodeValue().trim()));
         }
+        String vmName = null;
         n = vmNode.getAttributes().getNamedItem("name");
         if( n != null ) {
-            vm.setName(n.getNodeValue().trim());
+            vmName = n.getNodeValue().trim();
         }
         NodeList attributes = vmNode.getChildNodes();
 
@@ -1166,6 +1167,9 @@ public class vAppSupport extends AbstractVMSupport {
 
                     if( element.getNodeName().equalsIgnoreCase("AdminPassword") && element.hasChildNodes() ) {
                         adminPassword = element.getFirstChild().getNodeValue().trim();
+                    }
+                    else if( element.getNodeName().equalsIgnoreCase("ComputerName") && element.hasChildNodes() ) {
+                        vm.setName(element.getFirstChild().getNodeValue().trim());
                     }
                 }
                 if( adminPassword != null ) {
@@ -1348,7 +1352,12 @@ public class vAppSupport extends AbstractVMSupport {
             return null;
         }
         if( vm.getName() == null ) {
-            vm.setName(vm.getProviderVirtualMachineId());
+            if (vmName != null) {
+                vm.setName(vmName);
+            }
+            else {
+                vm.setName(vm.getProviderVirtualMachineId());
+            }
         }
         if( vm.getDescription() == null ) {
             vm.setDescription(vm.getName());
