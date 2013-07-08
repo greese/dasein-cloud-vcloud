@@ -51,6 +51,7 @@ import org.dasein.util.CalendarWrapper;
 import org.dasein.util.uom.time.Minute;
 import org.dasein.util.uom.time.TimePeriod;
 import org.w3c.dom.Document;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
@@ -763,6 +764,8 @@ public class TemplateSupport implements MachineImageSupport {
                                         }
                                     }
                                 }
+                            } else if (vmAttr.getNodeName().equalsIgnoreCase((nsString + "NetworkConnectionSection")) && vmAttr.hasChildNodes()) {
+                                parseNetworkConnectionSection(vmAttr, nsString, image);
                             }
                         }
                     }
@@ -819,6 +822,55 @@ public class TemplateSupport implements MachineImageSupport {
         }
         image.setTag("childVirtualMachineIds", ids.toString());
         return image;
+    }
+
+    private void parseNetworkConnectionSection(@Nonnull Node vmAttr, @Nonnull String nsString, @Nonnull MachineImage image) {
+        int primaryNetIndex = -1;
+        NodeList netList = vmAttr.getChildNodes();
+        for ( int i=0; i<netList.getLength(); i++ ) {
+            Node node = netList.item(i);
+            if (node.getNodeName().equalsIgnoreCase(nsString + "PrimaryNetworkConnectionIndex")) {
+                primaryNetIndex = Integer.parseInt(node.getFirstChild().getNodeValue().trim());
+                break;
+            }
+        }
+        String defaultVlanName = "";
+        String defaultVlanNameDHCP = "";
+        if (primaryNetIndex >= 0) {
+            for ( int i=0; i<netList.getLength(); i++ ) {
+                Node node = netList.item(i);
+                if (node.getNodeName().equalsIgnoreCase(nsString + "NetworkConnection")) {
+                    NodeList netNodeChildren = node.getChildNodes();
+                    for ( int j=0; j<netNodeChildren.getLength(); j++ ) {
+                        Node netNodeChild = netNodeChildren.item(j);
+                        if (netNodeChild.getNodeName().equalsIgnoreCase(nsString + "NetworkConnectionIndex")) {
+                            int thisIndex = Integer.parseInt(netNodeChild.getFirstChild().getNodeValue().trim());
+                            if (primaryNetIndex == thisIndex) {
+                                NamedNodeMap netNodeChildAttributes = node.getAttributes();
+                                Node networkNode = netNodeChildAttributes.getNamedItem("network");
+                                String networkName = networkNode.getNodeValue();
+                                for ( int k=0; k<netNodeChildren.getLength(); k++ ) {
+                                    Node netNodeChild2 = netNodeChildren.item(k);
+                                    if (netNodeChild2.getNodeName().equalsIgnoreCase(nsString + "IpAddressAllocationMode")) {
+                                        if ("DHCP".equalsIgnoreCase(netNodeChild2.getFirstChild().getNodeValue().trim())) {
+                                            defaultVlanNameDHCP = networkName;
+                                        } else {
+                                            defaultVlanName = networkName;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (!defaultVlanName.isEmpty()) {
+            image.setTag("defaultVlanName", defaultVlanName);
+        }
+        if (!defaultVlanNameDHCP.isEmpty()) {
+            image.setTag("defaultVlanNameDHCP", defaultVlanNameDHCP);
+        }
     }
 
     @Override
