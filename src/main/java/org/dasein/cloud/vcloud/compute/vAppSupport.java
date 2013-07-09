@@ -393,9 +393,22 @@ public class vAppSupport extends AbstractVMSupport {
             }
 
             final Document doc = method.parseXML(vAppResponse);
+            NodeList vmNodes = doc.getElementsByTagName(nsString + "Vm");
+
+            // vCloud has a 15 character limit on computer-name, reject upfront
+            final boolean multipleVMs = (vmNodes.getLength() > 1);
+            String basename = validateHostName(withLaunchOptions.getHostName());
+            if (multipleVMs) {
+                // take suffixes into account:
+                if (basename.length() > 13) {
+                    throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 13: '" + basename + "' is " + basename.length());
+                }
+            } else if (basename.length() > 15) {
+                throw new CloudException("The maximum name length is 15: '" + basename + "' is " + basename.length());
+            }
 
             final String vmId;
-            Node vmNode = doc.getElementsByTagName(nsString + "Vm").item(0);
+            Node vmNode = vmNodes.item(0);
 
             if( vmNode != null && vmNode.hasAttributes() ) {
                 Node vmHref = vmNode.getAttributes().getNamedItem("href");
@@ -497,15 +510,6 @@ public class vAppSupport extends AbstractVMSupport {
                             }
                         }
 
-                        try {
-                            deploy(vappId);
-                        } catch (CloudException e) {
-                            logger.error("Error deploying vApp " + vappId, e);
-                            return;
-                        } catch (InternalException e) {
-                            logger.error("Error deploying vApp " + vappId, e);
-                            return;
-                        }
                         String vAppGetResponse;
                         try {
                             vAppGetResponse = method.get("vApp", vappId);
@@ -551,8 +555,6 @@ public class vAppSupport extends AbstractVMSupport {
                                 int count = 1;
                                 for( int j=0; j<children.getLength(); j++ ) {
                                     Node vm = children.item(j);
-                                    String suffix = ((children.getLength() > 1) ? ("-" + count) : "");
-                                    count++;
 
                                     if(vm.getNodeName().contains(":"))nsString = vm.getNodeName().substring(0, vm.getNodeName().indexOf(":") + 1);
                                     else nsString = "";
@@ -560,6 +562,8 @@ public class vAppSupport extends AbstractVMSupport {
                                     if( vm.getNodeName().equalsIgnoreCase(nsString + "Vm") && vm.hasAttributes() ) {
                                         href = vm.getAttributes().getNamedItem("href");
                                         if( href != null ) {
+                                            String suffix = (multipleVMs ? ("-" + count) : "");
+                                            count++;
                                             String vmUrl = href.getNodeValue().trim();
 
                                             vmId = ((vCloud)getProvider()).toID(vmUrl);
@@ -696,6 +700,15 @@ public class vAppSupport extends AbstractVMSupport {
                         }
                         if( vmId == null ) {
                             logger.error("No virtual machines exist in " + vappId);
+                        }
+                        try {
+                            deploy(vappId);
+                        } catch (CloudException e) {
+                            logger.error("Error deploying vApp " + vappId, e);
+                            return;
+                        } catch (InternalException e) {
+                            logger.error("Error deploying vApp " + vappId, e);
+                            return;
                         }
                         try {
                             startVapp(vappId, true);
