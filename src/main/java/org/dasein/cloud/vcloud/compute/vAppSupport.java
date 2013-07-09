@@ -1114,14 +1114,100 @@ public class vAppSupport extends DefunctVM {
     public void stop(@Nonnull String vmId, boolean force) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "stopVM");
         try {
-            stop(vmId, force, true);
+            stopVappOrVm(vmId, force);
         }
         finally {
             APITrace.end();
         }
     }
 
-    public void stop(@Nonnull String vmId, boolean force, boolean wait) throws CloudException, InternalException {
+    private void stopVappOrVm(@Nonnull String id, boolean force) throws CloudException, InternalException {
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        String xml = method.get("vApp", id);
+        if (xml == null) {
+            throw new CloudException("No information returned for ID: " + id);
+        }
+        Document doc = method.parseXML(xml);
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
+        if( nodes.getLength() < 1 ) {
+            nodes = doc.getElementsByTagName(nsString + "Vm");
+        } else {
+            // 1. It's a vApp ID, nothing to search for, undeploy via vApp
+            if (force) {
+                undeploy(id);
+            } else {
+                undeploy(id, "shutdown");
+            }
+            return;
+        }
+
+        // 2. It's a VM. Find vApp ID
+        String vAppId = parseParentVappId(nodes, method);
+        if (vAppId == null) {
+            throw new CloudException("No parent vApp ID found for: " + id);
+        }
+
+        // 3. Does the vApp contain multiple VMs?
+        // 4a. If the vApp contains multiple VMs, undeploy VM
+        // 4b. If the vApp contains just one VM, undeploy the vApp
+        stopVappOrOneVm(vAppId, id, force);
+    }
+
+    private void stopVappOrOneVm(String vAppId, String vmId, boolean force) throws CloudException, InternalException {
+
+        // 3. Does the vApp contain multiple VMs?
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        String xml = method.get("vApp", vAppId);
+        if (xml == null) {
+            throw new CloudException("No information returned for ID: " + vAppId);
+        }
+
+        Document doc = method.parseXML(xml);
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
+        NodeList attributes = nodes.item(0).getChildNodes();
+
+        int count = 0;
+        for( int i=0; i<attributes.getLength(); i++ ) {
+            Node attribute = attributes.item(i);
+            if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+            else nsString = "";
+
+            if( attribute.getNodeName().equals(nsString + "Children") && attribute.hasChildNodes() ) {
+                NodeList children = attribute.getChildNodes();
+
+                for( int j=0; j<children.getLength(); j++ ) {
+                    Node vmNode = children.item(j);
+
+                    if( vmNode.getNodeName().equalsIgnoreCase(nsString + "Vm") && vmNode.hasAttributes() ) {
+                        count++;
+                    }
+                }
+            }
+        }
+
+        String powerAction = null;
+        if (!force) {
+            powerAction = "shutdown";
+        }
+
+        if (count > 1) {
+            // 4a. If the vApp contains multiple VMs, undeploy VM
+            undeploy(vmId, powerAction);
+        } else if (count == 1) {
+            // 4b. If the vApp contains just one VM, undeploy the vApp
+            undeploy(vAppId, powerAction);
+        } else {
+            throw new CloudException("Expected at least one VM");
+        }
+    }
+
+    private void stop(String vAppId, @Nonnull String vmId, boolean force, boolean wait, boolean killByVM) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("vApp", vmId);
 
@@ -1135,6 +1221,7 @@ public class vAppSupport extends DefunctVM {
             if( nodes.getLength() < 1 ) {
                 nodes = doc.getElementsByTagName(nsString + "Vm");
             }
+
             for( int i=0; i<nodes.getLength(); i++ ) {
                 NodeList links = nodes.item(i).getChildNodes();
 
@@ -1180,6 +1267,34 @@ public class vAppSupport extends DefunctVM {
                 }
             }
         }
+    }
+
+    private String parseParentVappId(NodeList nodes, vCloudMethod method) {
+        String nsString = "";
+        for( int i=0; i<nodes.getLength(); i++ ) {
+            NodeList links = nodes.item(i).getChildNodes();
+
+            for( int j=0; j<links.getLength(); j++ ) {
+                Node node = links.item(j);
+                if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                else nsString = "";
+
+                if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
+                    Node rel = node.getAttributes().getNamedItem("rel");
+
+                    if (rel != null && rel.getNodeValue().trim().equalsIgnoreCase("up")) {
+                        Node type = node.getAttributes().getNamedItem("type");
+                        if( type != null && type.getNodeValue().trim().equals(method.getMediaTypeForVApp()) ) {
+                            Node href = node.getAttributes().getNamedItem("href");
+                            if( href != null ) {
+                                return ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -1652,7 +1767,24 @@ public class vAppSupport extends DefunctVM {
         return vm;
     }
 
+    /**
+     * Default undeploy (uses powerOff for UndeployPowerAction)
+     * @param vmId VM or vApp ID
+     * @throws CloudException
+     * @throws InternalException
+     */
     public void undeploy(@Nonnull String vmId) throws CloudException, InternalException {
+        undeploy(vmId, null);
+    }
+
+    /**
+     * Default undeploy, uses supplied string for UndeployPowerAction
+     * @param vmId VM or vApp ID
+     * @param powerAction UndeployPowerAction. If null, use default.
+     * @throws CloudException
+     * @throws InternalException
+     */
+    public void undeploy(@Nonnull String vmId, String powerAction) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("vApp", vmId);
 
@@ -1685,7 +1817,13 @@ public class vAppSupport extends DefunctVM {
                                 String action = method.getAction(endpoint);
                                 StringBuilder payload = new StringBuilder();
 
-                                payload.append("<UndeployVAppParams xmlns=\"http://www.vmware.com/vcloud/v1.5\"/>");
+                                if (powerAction == null) {
+                                    payload.append("<UndeployVAppParams xmlns=\"http://www.vmware.com/vcloud/v1.5\"/>");
+                                } else {
+                                    payload.append("<UndeployVAppParams xmlns=\"http://www.vmware.com/vcloud/v1.5\"><UndeployPowerAction>");
+                                    payload.append(powerAction);
+                                    payload.append("</UndeployPowerAction></UndeployVAppParams>");
+                                }
                                 try {
                                     method.waitFor(method.post(action, endpoint, method.getMediaTypeForActionUndeployVApp(), payload.toString()));
                                 }
