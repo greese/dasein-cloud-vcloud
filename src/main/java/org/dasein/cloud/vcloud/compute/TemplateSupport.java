@@ -139,7 +139,7 @@ public class TemplateSupport implements MachineImageSupport {
             String vappId = (String)vm.getTag(vAppSupport.PARENT_VAPP_ID);
 
             if( running ) {
-                ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().undeploy(vappId);
+                ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().undeploy(vappId, "shutdown");
             }
             try {
                 String endpoint = method.toURL("vApp", vAppId);
@@ -169,7 +169,7 @@ public class TemplateSupport implements MachineImageSupport {
                         }
                         if( !vm.getCurrentState().equals(VmState.STOPPED) ) {
                             logger.warn("Current state of VM: " + vm.getCurrentState());
-                            ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().undeploy(vappId);
+                            ((vCloud)getProvider()).getComputeServices().getVirtualMachineSupport().undeploy(vappId, "shutdown");
                         }
                         response = method.post(vCloudMethod.CAPTURE_VAPP, vm.getProviderDataCenterId(), xml.toString());
                         if( response.equals("") ) {

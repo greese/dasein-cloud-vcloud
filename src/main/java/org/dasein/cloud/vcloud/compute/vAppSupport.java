@@ -1385,12 +1385,16 @@ public class vAppSupport extends DefunctVM {
 
             if( vms.size() == 1 && contains ) {
                 try { undeploy(vappId); }
-                catch( Throwable ignore ) { }
+                catch( Throwable t ) {
+                    logger.error(t.getMessage());
+                }
                 method.delete("vApp", vappId);
             }
             else {
                 try { undeploy(vmId); }
-                catch( Throwable ignore ) { }
+                catch( Throwable t ) {
+                    logger.error(t.getMessage());
+                }
                 method.delete("vApp", vmId);
             }
         }
