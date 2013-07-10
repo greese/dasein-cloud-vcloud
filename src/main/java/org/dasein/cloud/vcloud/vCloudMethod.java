@@ -164,7 +164,7 @@ public class vCloudMethod {
                 return _vdcs;
             }
             // There is a caching+recursion issue with authenticate()
-            int timeout = 4000;
+            int timeout = 10000;
             while (_vdcs == null) {
                 try {
                     Thread.sleep(400L);
