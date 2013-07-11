@@ -148,6 +148,7 @@ public class TemplateSupport implements MachineImageSupport {
                 xml.append("<CaptureVAppParams xmlns=\"http://www.vmware.com/vcloud/v1.5\" xmlns:ovf=\"http://schemas.dmtf.org/ovf/envelope/1\" name=\"").append(vCloud.escapeXml(options.getName())).append("\">");
                 xml.append("<Description>").append(options.getDescription()).append("</Description>");
                 xml.append("<Source href=\"").append(endpoint).append("\" type=\"").append(method.getMediaTypeForVApp()).append("\"/>");
+                xml.append("<CustomizationSection><ovf:Info/><CustomizeOnInstantiate>true</CustomizeOnInstantiate></CustomizationSection>");
                 xml.append("</CaptureVAppParams>");
 
                 String response = method.post(vCloudMethod.CAPTURE_VAPP, vm.getProviderDataCenterId(), xml.toString());
