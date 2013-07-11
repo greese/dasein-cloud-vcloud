@@ -441,7 +441,7 @@ public class vAppSupport extends DefunctVM {
                         vCloudMethod dmethod = new vCloudMethod((vCloud)getProvider());
                         dmethod.delete("vApp", vappId);
                     } catch (Throwable t) {
-                        logger.error("Problem cleaning up vApp " + vappId);
+                        logger.error("Problem cleaning up vApp " + vappId + ": " + t.getMessage());
                     }
                     throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 13: '" + basename + "' is " + basename.length());
                 }
