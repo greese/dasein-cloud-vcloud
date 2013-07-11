@@ -319,6 +319,12 @@ public class vAppSupport extends DefunctVM {
     public @Nonnull VirtualMachine launch(@Nonnull final VMLaunchOptions withLaunchOptions) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "launchVM");
         try {
+
+            final String basename = validateHostName(withLaunchOptions.getHostName());
+            if (basename.length() > 15) {
+               throw new CloudException("The maximum name length is 15: '" + basename + "' is " + basename.length());
+            }
+
             String vdcId = withLaunchOptions.getDataCenterId();
 
             if( vdcId == null ) {
@@ -428,7 +434,6 @@ public class vAppSupport extends DefunctVM {
 
             // vCloud has a 15 character limit on computer-name, reject upfront
             final boolean multipleVMs = (vmNodes.getLength() > 1);
-            String basename = validateHostName(withLaunchOptions.getHostName());
             if (multipleVMs) {
                 // take suffixes into account:
                 if (basename.length() > 13) {
