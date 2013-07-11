@@ -437,9 +437,16 @@ public class vAppSupport extends DefunctVM {
             if (multipleVMs) {
                 // take suffixes into account:
                 if (basename.length() > 13) {
+                    try {
+                        vCloudMethod dmethod = new vCloudMethod((vCloud)getProvider());
+                        dmethod.delete("vApp", vappId);
+                    } catch (Throwable t) {
+                        logger.error("Problem cleaning up vApp " + vappId);
+                    }
                     throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 13: '" + basename + "' is " + basename.length());
                 }
             } else if (basename.length() > 15) {
+                // should have been rejected already
                 throw new CloudException("The maximum name length is 15: '" + basename + "' is " + basename.length());
             }
 
