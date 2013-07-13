@@ -164,7 +164,7 @@ public class vCloudMethod {
                 return _vdcs;
             }
             // There is a caching+recursion issue with authenticate()
-            int timeout = 4000;
+            int timeout = 10000;
             while (_vdcs == null) {
                 try {
                     Thread.sleep(400L);
@@ -2142,6 +2142,7 @@ public class vCloudMethod {
         long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 30L);
         String taskId = null;
 
+        int passCount = 1;
         while( timeout > System.currentTimeMillis() ) {
             if( xmlTask == null || xmlTask.equals("") ) {
                 return;
@@ -2194,10 +2195,17 @@ public class vCloudMethod {
                     taskId = provider.toID(href.getNodeValue().trim());
                 }
             }
-            try { Thread.sleep(15000L); }
+            try {
+                if (passCount > 10) {
+                    Thread.sleep(10 * CalendarWrapper.SECOND);
+                } else {
+                    Thread.sleep(passCount * CalendarWrapper.SECOND);
+                }
+            }
             catch( InterruptedException ignore ) { }
             try { xmlTask = get("task", taskId); }
             catch( Throwable ignore ) { }
+            passCount += 1;
         }
         logger.warn("Task timed out: " + taskId);
     }

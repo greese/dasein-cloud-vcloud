@@ -320,6 +320,12 @@ public class vAppSupport extends DefunctVM {
         APITrace.begin(getProvider(), "launchVM");
         final String pw = withLaunchOptions.getBootstrapPassword();
         try {
+
+            final String basename = validateHostName(withLaunchOptions.getHostName());
+            if (basename.length() > 15) {
+               throw new CloudException("The maximum name length is 15: '" + basename + "' is " + basename.length());
+            }
+
             String vdcId = withLaunchOptions.getDataCenterId();
 
             if( vdcId == null ) {
@@ -344,21 +350,39 @@ public class vAppSupport extends DefunctVM {
 
             xml.append("<InstantiateVAppTemplateParams xmlns:ovf=\"http://schemas.dmtf.org/ovf/envelope/1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" name=\"").append(withLaunchOptions.getFriendlyName()).append(" Parent vApp\" xmlns=\"http://www.vmware.com/vcloud/v1.5\" deploy=\"false\" powerOn=\"false\">");
             xml.append("<Description>").append(img.getProviderMachineImageId()).append("</Description>");
-            String vlanId = withLaunchOptions.getVlanId();
-            final VLAN vlan;
 
-            if( vlanId != null ) {
-                vlan = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().getVlan(vlanId);
-                if( vlan != null ) {
-                    String vAppTemplateUrl = method.toURL("vAppTemplate", img.getProviderMachineImageId());
-                    xml.append("<Source href=\"").append(vAppTemplateUrl).append("\"/>");
-                }
-                else {
-                    throw new CloudException("Failed to find vlan " + vlanId);
+            String vlanId = withLaunchOptions.getVlanId();
+
+            // If vlanId is not specified, explicitly use default in machine image. If left out,
+            // default is not recognized in vCloud 1.5, error is: VCD entity network "X"
+            // specified for VM "Y" does not exist (even though it does exist)
+            if (vlanId == null || vlanId.trim().isEmpty()) {
+                String defaultVlanName = (String)img.getTag("defaultVlanName");
+                String defaultVlanNameDHCP = (String)img.getTag("defaultVlanNameDHCP");
+                if (defaultVlanName != null && !defaultVlanName.trim().isEmpty()) {
+                    Iterable<VLAN> vlans = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().listVlans();
+                    for (VLAN vlan : vlans) {
+                        if (defaultVlanName.equalsIgnoreCase(vlan.getName())) {
+                            vlanId = vlan.getProviderVlanId();
+                        }
+                    }
+                    if (vlanId == null) {
+                        throw new CloudException("Could not locate default vlan '" + defaultVlanName + "'");
+                    }
+                } else if (defaultVlanNameDHCP != null && !defaultVlanNameDHCP.trim().isEmpty()) {
+                    throw new CloudException("No vlan selected and the default is DHCP-based which is not supported");
+                } else {
+                    throw new CloudException("No vlan specified and no default.");
                 }
             }
+
+            final VLAN vlan = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().getVlan(vlanId);
+            if( vlan != null ) {
+                String vAppTemplateUrl = method.toURL("vAppTemplate", img.getProviderMachineImageId());
+                xml.append("<Source href=\"").append(vAppTemplateUrl).append("\"/>");
+            }
             else {
-                throw new CloudException("No vlan specified.");
+                throw new CloudException("Failed to find vlan " + vlanId);
             }
             xml.append("<AllEULAsAccepted>true</AllEULAsAccepted>");
             xml.append("</InstantiateVAppTemplateParams>");
@@ -407,9 +431,28 @@ public class vAppSupport extends DefunctVM {
             }
 
             final Document doc = method.parseXML(vAppResponse);
+            NodeList vmNodes = doc.getElementsByTagName(nsString + "Vm");
+
+            // vCloud has a 15 character limit on computer-name, reject upfront
+            final boolean multipleVMs = (vmNodes.getLength() > 1);
+            if (multipleVMs) {
+                // take suffixes into account:
+                if (basename.length() > 13) {
+                    try {
+                        vCloudMethod dmethod = new vCloudMethod((vCloud)getProvider());
+                        dmethod.delete("vApp", vappId);
+                    } catch (Throwable t) {
+                        logger.error("Problem cleaning up vApp " + vappId + ": " + t.getMessage());
+                    }
+                    throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 13: '" + basename + "' is " + basename.length());
+                }
+            } else if (basename.length() > 15) {
+                // should have been rejected already
+                throw new CloudException("The maximum name length is 15: '" + basename + "' is " + basename.length());
+            }
 
             final String vmId;
-            Node vmNode = doc.getElementsByTagName(nsString + "Vm").item(0);
+            Node vmNode = vmNodes.item(0);
 
             if( vmNode != null && vmNode.hasAttributes() ) {
                 Node vmHref = vmNode.getAttributes().getNamedItem("href");
@@ -511,15 +554,6 @@ public class vAppSupport extends DefunctVM {
                             }
                         }
 
-                        try {
-                            deploy(vappId);
-                        } catch (CloudException e) {
-                            logger.error("Error deploying vApp " + vappId, e);
-                            return;
-                        } catch (InternalException e) {
-                            logger.error("Error deploying vApp " + vappId, e);
-                            return;
-                        }
                         String vAppGetResponse;
                         try {
                             vAppGetResponse = method.get("vApp", vappId);
@@ -565,8 +599,6 @@ public class vAppSupport extends DefunctVM {
                                 int count = 1;
                                 for( int j=0; j<children.getLength(); j++ ) {
                                     Node vm = children.item(j);
-                                    String suffix = ((children.getLength() > 1) ? ("-" + count) : "");
-                                    count++;
 
                                     if(vm.getNodeName().contains(":"))nsString = vm.getNodeName().substring(0, vm.getNodeName().indexOf(":") + 1);
                                     else nsString = "";
@@ -574,6 +606,8 @@ public class vAppSupport extends DefunctVM {
                                     if( vm.getNodeName().equalsIgnoreCase(nsString + "Vm") && vm.hasAttributes() ) {
                                         href = vm.getAttributes().getNamedItem("href");
                                         if( href != null ) {
+                                            String suffix = (multipleVMs ? ("-" + count) : "");
+                                            count++;
                                             String vmUrl = href.getNodeValue().trim();
 
                                             vmId = ((vCloud)getProvider()).toID(vmUrl);
@@ -709,6 +743,15 @@ public class vAppSupport extends DefunctVM {
                         }
                         if( vmId == null ) {
                             logger.error("No virtual machines exist in " + vappId);
+                        }
+                        try {
+                            deploy(vappId);
+                        } catch (CloudException e) {
+                            logger.error("Error deploying vApp " + vappId, e);
+                            return;
+                        } catch (InternalException e) {
+                            logger.error("Error deploying vApp " + vappId, e);
+                            return;
                         }
                         try {
                             startVapp(vappId, true);
@@ -1086,14 +1129,100 @@ public class vAppSupport extends DefunctVM {
     public void stop(@Nonnull String vmId, boolean force) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "stopVM");
         try {
-            stop(vmId, force, true);
+            stopVappOrVm(vmId, force);
         }
         finally {
             APITrace.end();
         }
     }
 
-    public void stop(@Nonnull String vmId, boolean force, boolean wait) throws CloudException, InternalException {
+    private void stopVappOrVm(@Nonnull String id, boolean force) throws CloudException, InternalException {
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        String xml = method.get("vApp", id);
+        if (xml == null) {
+            throw new CloudException("No information returned for ID: " + id);
+        }
+        Document doc = method.parseXML(xml);
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
+        if( nodes.getLength() < 1 ) {
+            nodes = doc.getElementsByTagName(nsString + "Vm");
+        } else {
+            // 1. It's a vApp ID, nothing to search for, undeploy via vApp
+            if (force) {
+                undeploy(id);
+            } else {
+                undeploy(id, "shutdown");
+            }
+            return;
+        }
+
+        // 2. It's a VM. Find vApp ID
+        String vAppId = parseParentVappId(nodes, method);
+        if (vAppId == null) {
+            throw new CloudException("No parent vApp ID found for: " + id);
+        }
+
+        // 3. Does the vApp contain multiple VMs?
+        // 4a. If the vApp contains multiple VMs, undeploy VM
+        // 4b. If the vApp contains just one VM, undeploy the vApp
+        stopVappOrOneVm(vAppId, id, force);
+    }
+
+    private void stopVappOrOneVm(String vAppId, String vmId, boolean force) throws CloudException, InternalException {
+
+        // 3. Does the vApp contain multiple VMs?
+        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        String xml = method.get("vApp", vAppId);
+        if (xml == null) {
+            throw new CloudException("No information returned for ID: " + vAppId);
+        }
+
+        Document doc = method.parseXML(xml);
+        String docElementTagName = doc.getDocumentElement().getTagName();
+        String nsString = "";
+        if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
+        NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
+        NodeList attributes = nodes.item(0).getChildNodes();
+
+        int count = 0;
+        for( int i=0; i<attributes.getLength(); i++ ) {
+            Node attribute = attributes.item(i);
+            if(attribute.getNodeName().contains(":"))nsString = attribute.getNodeName().substring(0, attribute.getNodeName().indexOf(":") + 1);
+            else nsString = "";
+
+            if( attribute.getNodeName().equals(nsString + "Children") && attribute.hasChildNodes() ) {
+                NodeList children = attribute.getChildNodes();
+
+                for( int j=0; j<children.getLength(); j++ ) {
+                    Node vmNode = children.item(j);
+
+                    if( vmNode.getNodeName().equalsIgnoreCase(nsString + "Vm") && vmNode.hasAttributes() ) {
+                        count++;
+                    }
+                }
+            }
+        }
+
+        String powerAction = null;
+        if (!force) {
+            powerAction = "shutdown";
+        }
+
+        if (count > 1) {
+            // 4a. If the vApp contains multiple VMs, undeploy VM
+            undeploy(vmId, powerAction);
+        } else if (count == 1) {
+            // 4b. If the vApp contains just one VM, undeploy the vApp
+            undeploy(vAppId, powerAction);
+        } else {
+            throw new CloudException("Expected at least one VM");
+        }
+    }
+
+    private void stop(String vAppId, @Nonnull String vmId, boolean force, boolean wait, boolean killByVM) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("vApp", vmId);
 
@@ -1107,6 +1236,7 @@ public class vAppSupport extends DefunctVM {
             if( nodes.getLength() < 1 ) {
                 nodes = doc.getElementsByTagName(nsString + "Vm");
             }
+
             for( int i=0; i<nodes.getLength(); i++ ) {
                 NodeList links = nodes.item(i).getChildNodes();
 
@@ -1152,6 +1282,34 @@ public class vAppSupport extends DefunctVM {
                 }
             }
         }
+    }
+
+    private String parseParentVappId(NodeList nodes, vCloudMethod method) {
+        String nsString = "";
+        for( int i=0; i<nodes.getLength(); i++ ) {
+            NodeList links = nodes.item(i).getChildNodes();
+
+            for( int j=0; j<links.getLength(); j++ ) {
+                Node node = links.item(j);
+                if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                else nsString = "";
+
+                if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
+                    Node rel = node.getAttributes().getNamedItem("rel");
+
+                    if (rel != null && rel.getNodeValue().trim().equalsIgnoreCase("up")) {
+                        Node type = node.getAttributes().getNamedItem("type");
+                        if( type != null && type.getNodeValue().trim().equals(method.getMediaTypeForVApp()) ) {
+                            Node href = node.getAttributes().getNamedItem("href");
+                            if( href != null ) {
+                                return ((vCloud)getProvider()).toID(href.getNodeValue().trim());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -1242,12 +1400,16 @@ public class vAppSupport extends DefunctVM {
 
             if( vms.size() == 1 && contains ) {
                 try { undeploy(vappId); }
-                catch( Throwable ignore ) { }
+                catch( Throwable t ) {
+                    logger.error(t.getMessage());
+                }
                 method.delete("vApp", vappId);
             }
             else {
                 try { undeploy(vmId); }
-                catch( Throwable ignore ) { }
+                catch( Throwable t ) {
+                    logger.error(t.getMessage());
+                }
                 method.delete("vApp", vmId);
             }
         }
@@ -1633,7 +1795,24 @@ public class vAppSupport extends DefunctVM {
         return vm;
     }
 
+    /**
+     * Default undeploy (uses powerOff for UndeployPowerAction)
+     * @param vmId VM or vApp ID
+     * @throws CloudException
+     * @throws InternalException
+     */
     public void undeploy(@Nonnull String vmId) throws CloudException, InternalException {
+        undeploy(vmId, null);
+    }
+
+    /**
+     * Default undeploy, uses supplied string for UndeployPowerAction
+     * @param vmId VM or vApp ID
+     * @param powerAction UndeployPowerAction. If null, use default.
+     * @throws CloudException
+     * @throws InternalException
+     */
+    public void undeploy(@Nonnull String vmId, String powerAction) throws CloudException, InternalException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
         String xml = method.get("vApp", vmId);
 
@@ -1666,7 +1845,13 @@ public class vAppSupport extends DefunctVM {
                                 String action = method.getAction(endpoint);
                                 StringBuilder payload = new StringBuilder();
 
-                                payload.append("<UndeployVAppParams xmlns=\"http://www.vmware.com/vcloud/v1.5\"/>");
+                                if (powerAction == null) {
+                                    payload.append("<UndeployVAppParams xmlns=\"http://www.vmware.com/vcloud/v1.5\"/>");
+                                } else {
+                                    payload.append("<UndeployVAppParams xmlns=\"http://www.vmware.com/vcloud/v1.5\"><UndeployPowerAction>");
+                                    payload.append(powerAction);
+                                    payload.append("</UndeployPowerAction></UndeployVAppParams>");
+                                }
                                 try {
                                     method.waitFor(method.post(action, endpoint, method.getMediaTypeForActionUndeployVApp(), payload.toString()));
                                 }
