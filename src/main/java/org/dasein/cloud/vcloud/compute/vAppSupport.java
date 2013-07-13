@@ -305,6 +305,7 @@ public class vAppSupport extends AbstractVMSupport {
     @Override
     public @Nonnull VirtualMachine launch(@Nonnull final VMLaunchOptions withLaunchOptions) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "launchVM");
+        final String pw = withLaunchOptions.getBootstrapPassword();
         try {
             String vdcId = withLaunchOptions.getDataCenterId();
 
@@ -574,7 +575,6 @@ public class vAppSupport extends AbstractVMSupport {
                                             guestXml.append("<VirtualMachineId>").append(UUID.randomUUID().toString()).append("</VirtualMachineId>");
                                             guestXml.append("<JoinDomainEnabled>false</JoinDomainEnabled>");
                                             guestXml.append("<UseOrgSettings>false</UseOrgSettings>");
-                                            String pw = withLaunchOptions.getBootstrapPassword();
 
                                             guestXml.append("<AdminPasswordEnabled>true</AdminPasswordEnabled>");
                                             if( pw != null ) {
@@ -712,6 +712,9 @@ public class vAppSupport extends AbstractVMSupport {
             t.setDaemon(true);
             t.start();
             vm.setProviderMachineImageId(img.getProviderMachineImageId());
+            if (pw != null) {
+                vm.setRootPassword(pw);
+            }
             return vm;
         }
         finally {
