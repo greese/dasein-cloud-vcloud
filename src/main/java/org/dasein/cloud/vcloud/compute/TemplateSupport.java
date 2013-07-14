@@ -727,9 +727,6 @@ public class TemplateSupport implements MachineImageSupport {
                                             if( image.getName() == null ) {
                                                 image.setName(n);
                                             }
-                                            else {
-                                                image.setName(image.getName() + " - " + n);
-                                            }
                                         }
                                     }
                                 }
