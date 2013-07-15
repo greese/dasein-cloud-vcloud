@@ -1257,11 +1257,13 @@ public class TemplateSupport implements MachineImageSupport {
     @Override
     public @Nonnull Iterable<MachineImage> searchImages(@Nullable String accountNumber, @Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass ... imageClasses) throws CloudException, InternalException {
         ArrayList<MachineImage> matches = new ArrayList<MachineImage>();
-
+        if (accountNumber == null) {
+            return matches;
+        }
         if( imageClasses == null || imageClasses.length < 2 ) {
             for( MachineImage img : listImages(null) ) {
                 if( matches(img, keyword, platform, architecture) ) {
-                    if( accountNumber != null && accountNumber.equals(img.getProviderOwnerId()) ) {
+                    if( accountNumber.equals(img.getProviderOwnerId()) ) {
                         matches.add(img);
                     }
                 }
@@ -1271,7 +1273,7 @@ public class TemplateSupport implements MachineImageSupport {
             for( ImageClass cls : imageClasses ) {
                 for( MachineImage img : listImages(cls) ) {
                     if( matches(img, keyword, platform, architecture) ) {
-                        if( accountNumber != null && accountNumber.equals(img.getProviderOwnerId()) ) {
+                        if( accountNumber.equals(img.getProviderOwnerId()) ) {
                             matches.add(img);
                         }
                     }
