@@ -1901,7 +1901,6 @@ public class vAppSupport extends DefunctVM {
 
     private @Nonnull String validateHostName(@Nonnull String src) {
         StringBuilder str = new StringBuilder();
-        src = src.toLowerCase();
         for( int i=0; i<src.length(); i++ ) {
             char c = src.charAt(i);
 
