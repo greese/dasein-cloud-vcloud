@@ -632,12 +632,18 @@ public class vAppSupport extends DefunctVM {
                                                 guestXml.append("<AdminPasswordAuto>true</AdminPasswordAuto>");
                                             }
                                             guestXml.append("<ResetPasswordRequired>false</ResetPasswordRequired>");
-                                            guestXml.append("<ComputerName>").append(vCloud.escapeXml(validateHostName(withLaunchOptions.getHostName() + suffix))).append("</ComputerName>");
-                                            String userData = withLaunchOptions.getUserData();
 
+                                            String userData = withLaunchOptions.getUserData();
                                             if( userData != null && userData.length() > 0 ) {
                                                 guestXml.append("<CustomizationScript>").append(vCloud.escapeXml(userData)).append("</CustomizationScript>");
+                                            } else {
+                                                String customizationScript = parseCustomizationScript(vm);
+                                                if (customizationScript != null) {
+                                                    guestXml.append("<CustomizationScript>").append(vCloud.escapeXml(customizationScript)).append("</CustomizationScript>");
+                                                }
                                             }
+
+                                            guestXml.append("<ComputerName>").append(vCloud.escapeXml(validateHostName(withLaunchOptions.getHostName() + suffix))).append("</ComputerName>");
                                             guestXml.append("</GuestCustomizationSection>");
 
                                             try {
@@ -776,6 +782,26 @@ public class vAppSupport extends DefunctVM {
         finally {
             APITrace.end();
         }
+    }
+
+    private String parseCustomizationScript(@Nonnull Node vm) {
+        NodeList attributes = vm.getChildNodes();
+        for( int i=0; i<attributes.getLength(); i++ ) {
+            Node attribute = attributes.item(i);
+            if( attribute.getNodeName().equalsIgnoreCase("GuestCustomizationSection") && attribute.hasChildNodes() ) {
+                NodeList elements = attribute.getChildNodes();
+                for( int j=0; j<elements.getLength(); j++ ) {
+                    Node element = elements.item(j);
+                    if( element.getNodeName().equalsIgnoreCase("CustomizationScript") && element.hasChildNodes() ) {
+                        String customizationScript = element.getFirstChild().getNodeValue().trim();
+                        if (customizationScript != null) {
+                            return customizationScript;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -1875,7 +1901,6 @@ public class vAppSupport extends DefunctVM {
 
     private @Nonnull String validateHostName(@Nonnull String src) {
         StringBuilder str = new StringBuilder();
-        src = src.toLowerCase();
         for( int i=0; i<src.length(); i++ ) {
             char c = src.charAt(i);
 

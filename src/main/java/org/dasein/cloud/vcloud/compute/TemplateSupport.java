@@ -50,6 +50,7 @@ import org.dasein.cloud.vcloud.vCloudMethod;
 import org.dasein.util.CalendarWrapper;
 import org.dasein.util.uom.time.Minute;
 import org.dasein.util.uom.time.TimePeriod;
+import org.dasein.util.uom.time.Week;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
@@ -64,6 +65,8 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.TreeSet;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Implements vApp Template support in accordance with the Dasein Cloud image support model. Dasein Cloud images map
@@ -75,6 +78,7 @@ import java.util.TreeSet;
  */
 public class TemplateSupport implements MachineImageSupport {
     static private final Logger logger = vCloud.getLogger(TemplateSupport.class);
+    static private final Lock lockCreationLock = new ReentrantLock();
 
     static public class Catalog {
         public String catalogId;
@@ -501,8 +505,47 @@ public class TemplateSupport implements MachineImageSupport {
 
     @Override
     public @Nonnull Iterable<MachineImage> listImages(@Nullable ImageClass cls) throws CloudException, InternalException {
+        Cache<MachineImage> cache = Cache.getInstance(getProvider(), "listImages", MachineImage.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(6, TimePeriod.MINUTE));
+        Iterable<MachineImage> imageList = cache.get(getContext());
+        if (imageList != null) {
+            return imageList;
+        }
+
+        // Limit the amount of listImage calls to one-at-a-time per REGION_ACCOUNT with a lock.
+        // The call can be very expensive.
+        Cache<Lock> lockCache = Cache.getInstance(getProvider(), "listImagesLock", Lock.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Week>(500, TimePeriod.WEEK));
+        Iterable<Lock> lockList = lockCache.get(getContext());
+        if (lockList == null) {
+            lockCreationLock.lock();
+            try {
+                if (lockList == null) {
+                    ArrayList<Lock> oneLockList = new ArrayList<Lock>();
+                    oneLockList.add(new ReentrantLock());
+                    lockCache.put(getContext(), oneLockList);
+                }
+                lockList = lockCache.get(getContext());
+            } finally {
+                lockCreationLock.unlock();
+            }
+        }
+        Lock lock = null;
+        for (Lock onelock: lockList) {
+            lock = onelock;
+            break;
+        }
+        if (lock == null) {
+            throw new InternalException("No lock.");
+        }
+
         APITrace.begin(getProvider(), "listImages");
+        lock.lock();
         try {
+            Iterable<MachineImage> imageList2 = cache.get(getContext());
+            if (imageList2 != null) {
+                // A thread we were waiting on has refreshed the cache
+                return imageList2;
+            }
+
             if( cls != null && !cls.equals(ImageClass.MACHINE) ) {
                 return Collections.emptyList();
             }
@@ -560,9 +603,11 @@ public class TemplateSupport implements MachineImageSupport {
 
                 }
             }
+            cache.put(getContext(), images);
             return images;
         }
         finally {
+            lock.unlock();
             APITrace.end();
         }
     }
@@ -726,9 +771,6 @@ public class TemplateSupport implements MachineImageSupport {
                                         if( n.length() > 0 ) {
                                             if( image.getName() == null ) {
                                                 image.setName(n);
-                                            }
-                                            else {
-                                                image.setName(image.getName() + " - " + n);
                                             }
                                         }
                                     }
@@ -1260,11 +1302,13 @@ public class TemplateSupport implements MachineImageSupport {
     @Override
     public @Nonnull Iterable<MachineImage> searchImages(@Nullable String accountNumber, @Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass ... imageClasses) throws CloudException, InternalException {
         ArrayList<MachineImage> matches = new ArrayList<MachineImage>();
-
+        if (accountNumber == null) {
+            return matches;
+        }
         if( imageClasses == null || imageClasses.length < 2 ) {
             for( MachineImage img : listImages(null) ) {
                 if( matches(img, keyword, platform, architecture) ) {
-                    if( accountNumber != null && accountNumber.equals(img.getProviderOwnerId()) ) {
+                    if( accountNumber.equals(img.getProviderOwnerId()) ) {
                         matches.add(img);
                     }
                 }
@@ -1274,7 +1318,7 @@ public class TemplateSupport implements MachineImageSupport {
             for( ImageClass cls : imageClasses ) {
                 for( MachineImage img : listImages(cls) ) {
                     if( matches(img, keyword, platform, architecture) ) {
-                        if( accountNumber != null && accountNumber.equals(img.getProviderOwnerId()) ) {
+                        if( accountNumber.equals(img.getProviderOwnerId()) ) {
                             matches.add(img);
                         }
                     }
