@@ -427,6 +427,12 @@ public class vAppSupport extends DefunctVM {
             String vAppResponse = method.get("vApp", vappId);
 
             if( vAppResponse == null ) {
+                try {
+                    undeploy(vappId);
+                    method.delete("vApp", vappId);
+                } catch( Throwable t ) {
+                    logger.error("Problem backing out after vApp went away: " + t.getMessage());
+                }
                 throw new CloudException("vApp went away");
             }
 
@@ -469,12 +475,24 @@ public class vAppSupport extends DefunctVM {
             }
 
             if( vmId == null ) {
+                try {
+                    undeploy(vappId);
+                    method.delete("vApp", vappId);
+                } catch( Throwable t ) {
+                    logger.error("Problem backing out after no virtual machines exist in response: " + t.getMessage());
+                }
                 throw new CloudException("No virtual machines exist in response");
             }
             VirtualMachine vm = getVirtualMachine(vmId);
 
             if( vm == null ) {
-                throw new CloudException("Unable to identify vm " + vmId + ".");
+                try {
+                    undeploy(vappId);
+                    method.delete("vApp", vappId);
+                } catch( Throwable t ) {
+                    logger.error("Problem backing out after failing to identify VM in response: " + t.getMessage());
+                }
+                throw new CloudException("Unable to identify VM " + vmId + ".");
             }
 
             Thread t = new Thread() {
