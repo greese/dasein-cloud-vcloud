@@ -494,6 +494,7 @@ public class vAppSupport extends DefunctVM {
                 }
                 throw new CloudException("Unable to identify VM " + vmId + ".");
             }
+            vm.setName(basename);
 
             Thread t = new Thread() {
                 public void run() {
