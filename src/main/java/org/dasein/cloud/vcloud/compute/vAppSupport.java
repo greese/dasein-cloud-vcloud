@@ -320,7 +320,7 @@ public class vAppSupport extends DefunctVM {
         APITrace.begin(getProvider(), "launchVM");
         final String pw = withLaunchOptions.getBootstrapPassword();
         try {
-
+            final String fullname = withLaunchOptions.getHostName();
             final String basename = validateHostName(withLaunchOptions.getHostName());
             if (basename.length() > 15) {
                throw new CloudException("The maximum name length is 15: '" + basename + "' is " + basename.length());
@@ -452,9 +452,21 @@ public class vAppSupport extends DefunctVM {
                     }
                     throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 13: '" + basename + "' is " + basename.length());
                 }
+                if (fullname.length() > 126) {
+                    try {
+                        vCloudMethod dmethod = new vCloudMethod((vCloud)getProvider());
+                        dmethod.delete("vApp", vappId);
+                    } catch (Throwable t) {
+                        logger.error("Problem cleaning up vApp " + vappId + ": " + t.getMessage());
+                    }
+                    throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 126: '" + basename + "' is " + basename.length());
+                }
             } else if (basename.length() > 15) {
                 // should have been rejected already
                 throw new CloudException("The maximum name length is 15: '" + basename + "' is " + basename.length());
+            }
+            else if (fullname.length() > 128) {
+                throw new CloudException("The maximum name length is 128: '" + basename + "' is " + basename.length());
             }
 
             final String vmId;
@@ -494,7 +506,6 @@ public class vAppSupport extends DefunctVM {
                 }
                 throw new CloudException("Unable to identify VM " + vmId + ".");
             }
-            vm.setName(basename);
 
             Thread t = new Thread() {
                 public void run() {
@@ -605,6 +616,7 @@ public class vAppSupport extends DefunctVM {
                             logger.error("vApp went away");
                         }
                         vapp = vapps.item(0);
+
                         NodeList attributes = vapp.getChildNodes();
                         String vmId = null;
 
@@ -672,6 +684,22 @@ public class vAppSupport extends DefunctVM {
                                                 return;
                                             } catch (InternalException e) {
                                                 logger.error("Error configuring guest for vApp " + vappId, e);
+                                                return;
+                                            }
+
+                                            StringBuilder vmXml = new StringBuilder();
+                                            vmXml.append("<vcloud:Vm xmlns:vcloud=\"http://www.vmware.com/vcloud/v1.5\" ");
+                                            vmXml.append("name=\"").append(vCloud.escapeXml(fullname + suffix)).append("\">");
+                                            vmXml.append("<vcloud:Description>").append(withLaunchOptions.getDescription()).append("</vcloud:Description>");
+                                            vmXml.append("</vcloud:Vm>");
+
+                                            try {
+                                                method.waitFor(method.put("", vmUrl, method.getMediaTypeForVM(), vmXml.toString()));
+                                            } catch (CloudException e) {
+                                                logger.error("Error configuring vm for vApp " + vappId, e);
+                                                return;
+                                            } catch (InternalException e) {
+                                                logger.error("Error configuring vm for vApp " + vappId, e);
                                                 return;
                                             }
 
@@ -1568,6 +1596,7 @@ public class vAppSupport extends DefunctVM {
             vm.setCurrentState(toState(n.getNodeValue().trim()));
         }
         String vmName = null;
+        String computerName = null;
         n = vmNode.getAttributes().getNamedItem("name");
         if( n != null ) {
             vmName = n.getNodeValue().trim();
@@ -1591,7 +1620,7 @@ public class vAppSupport extends DefunctVM {
                         adminPassword = element.getFirstChild().getNodeValue().trim();
                     }
                     else if( element.getNodeName().equalsIgnoreCase("ComputerName") && element.hasChildNodes() ) {
-                        vm.setName(element.getFirstChild().getNodeValue().trim());
+                        computerName = element.getFirstChild().getNodeValue().trim();
                     }
                 }
                 if( adminPassword != null ) {
@@ -1773,13 +1802,14 @@ public class vAppSupport extends DefunctVM {
         if( vm.getProviderVirtualMachineId() == null ) {
             return null;
         }
-        if( vm.getName() == null ) {
-            if (vmName != null) {
-                vm.setName(vmName);
-            }
-            else {
-                vm.setName(vm.getProviderVirtualMachineId());
-            }
+        if (vmName != null) {
+            vm.setName(vmName);
+        }
+        else if (computerName != null) {
+            vm.setName(computerName);
+        }
+        else {
+            vm.setName(vm.getProviderVirtualMachineId());
         }
         if( vm.getDescription() == null ) {
             vm.setDescription(vm.getName());
