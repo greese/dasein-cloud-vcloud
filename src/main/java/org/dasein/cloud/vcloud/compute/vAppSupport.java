@@ -964,6 +964,11 @@ public class vAppSupport extends AbstractVMSupport {
         }
     }
 
+    @Override
+    public void terminate(@Nonnull String vmId, String explanation)throws InternalException, CloudException{
+        terminate(vmId);
+    }
+
     private @Nonnull VmState toState(@Nonnull String status) throws CloudException {
         try {
             int s = Integer.parseInt(status);
@@ -1195,7 +1200,8 @@ public class vAppSupport extends AbstractVMSupport {
                 }
                 VirtualMachineProduct product = null;
 
-                for( VirtualMachineProduct prd : listProducts(Architecture.I64) ) {
+                Iterable<VirtualMachineProduct> s = listProducts(Architecture.I64);
+                for( VirtualMachineProduct prd : s ) {
                     if( prd.getCpuCount() == cpu && memory == prd.getRamSize().intValue() ) {
                         product = prd;
                         break;
