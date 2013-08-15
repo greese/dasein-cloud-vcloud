@@ -25,14 +25,13 @@ import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.vcloud.compute.vCloudComputeServices;
 import org.dasein.cloud.vcloud.network.vCloudNetworkServices;
-import org.dasein.util.CalendarWrapper;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.util.Calendar;
 import java.util.Properties;
 import java.util.TimeZone;
 
@@ -160,6 +159,33 @@ public class vCloud extends AbstractCloud {
         }
     }
 
+
+    public @Nonnull String getVMProductsResource() {
+        ProviderContext ctx = getContext();
+        String value;
+
+        if( ctx == null ) {
+            value = null;
+        }
+        else {
+            Properties p = ctx.getCustomProperties();
+
+            if( p == null ) {
+                value = null;
+            }
+            else {
+                value = p.getProperty("vmproducts");
+            }
+        }
+        if( value == null ) {
+            value = System.getProperty("vcloud.vmproducts");
+        }
+        if( value == null ) {
+            value = "/org/dasein/cloud/vcloud/vmproducts.json";
+        }
+        return value;
+    }
+
     public boolean isCompat() {
         ProviderContext ctx = getContext();
         String value;
@@ -206,88 +232,20 @@ public class vCloud extends AbstractCloud {
         return (value != null && value.equalsIgnoreCase("true"));
     }
 
-    public @Nonnegative long parseTime(@Nullable String time) throws CloudException {
+    public static @Nonnegative long parseTime(@Nullable String time) throws CloudException {
         if( time == null || time.length() < 1 ) {
             return 0L;
         }
-        int idx = time.lastIndexOf("-");
-
-        if( idx > -1 ) {
-            String[] parts = time.substring(idx+1).split(":");
-
-            time = time.substring(0, idx);
-            if( parts.length == 2 ) {
-                long offset = (Long.parseLong(parts[0]) * CalendarWrapper.HOUR) + (Long.parseLong(parts[1]) * CalendarWrapper.MINUTE);
-
-                SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-                String[] ids = TimeZone.getAvailableIDs(-((int)offset));
-
-                if( ids.length > 0 ) {
-                    TimeZone zone = TimeZone.getTimeZone(ids[0]);
-
-                    fmt.setTimeZone(zone);
-                    if( time.length() > 0 ) {
-                        try {
-                            return fmt.parse(time).getTime();
-                        }
-                        catch( ParseException e ) {
-                            throw new CloudException("Could not parse date: " + time);
-                        }
-                    }
-                }
-
-            }
+        Calendar cal = ISO8601.parse(time);
+        if (cal == null) {
+            return 0L;
         }
-        idx = time.lastIndexOf("+");
-
-        if( idx > -1 ) {
-            String[] parts = time.substring(idx+1).split(":");
-
-            time = time.substring(0, idx);
-            if( parts.length == 2 ) {
-                long offset = (Long.parseLong(parts[0]) * CalendarWrapper.HOUR) + (Long.parseLong(parts[1]) * CalendarWrapper.MINUTE);
-
-                SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-                String[] ids = TimeZone.getAvailableIDs((int)offset);
-
-                if( ids.length > 0 ) {
-                    TimeZone zone = TimeZone.getTimeZone(ids[0]);
-
-                    fmt.setTimeZone(zone);
-                    if( time.length() > 0 ) {
-                        try {
-                            return fmt.parse(time).getTime();
-                        }
-                        catch( ParseException e ) {
-                            throw new CloudException("Could not parse date: " + time);
-                        }
-                    }
-                }
-
-            }
-        }
-        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-
-        if( time.length() > 0 ) {
-            try {
-                return fmt.parse(time).getTime();
-            }
-            catch( ParseException e ) {
-                fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-                try {
-                    return fmt.parse(time).getTime();
-                }
-                catch( ParseException encore ) {
-                    throw new CloudException("Could not parse date: " + time);
-                }
-            }
-        }
-        return 0L;
+        return cal.getTimeInMillis();
     }
 
     @Override
     public String testContext() {
-        APITrace.begin(this, "Cloud.testContext");
+        APITrace.begin(this, "testContext");
         try {
             ProviderContext ctx = getContext();
 
@@ -302,7 +260,7 @@ public class vCloud extends AbstractCloud {
                 return ctx.getAccountNumber();
             }
             catch( Throwable t ) {
-                logger.warn("Unable to connect to AWS for " + ctx.getAccountNumber() + ": " + t.getMessage());
+                logger.warn("Unable to connect to " + getCloudName() + " for " + ctx.getAccountNumber() + ": " + t.getMessage());
                 return null;
             }
         }
@@ -331,32 +289,4 @@ public class vCloud extends AbstractCloud {
 
         return (getProviderName() + " - " + getCloudName() + (ctx == null ? "" : " [" + ctx.getAccountNumber() + "]"));
     }
-    
-    public static Date parseIsoDate(String isoDateString) {
-		SimpleDateFormat df = new SimpleDateFormat( ISO8601_PATTERN );
-        
-		//handle TimeZone info
-        
-		 if ( isoDateString.endsWith( "Z" ) ) {
-			 isoDateString = isoDateString.substring( 0, isoDateString.length() - 1) + "GMT-00:00";
-	     } 
-		 else {
-			int exclude = 6;
-	        
-	        String first = isoDateString.substring( 0, isoDateString.length() - exclude );
-	        String second = isoDateString.substring( isoDateString.length() - exclude, isoDateString.length() );
-	
-	        isoDateString = first + "GMT" + second;
-	    }
-		df.setTimeZone(TimeZone.getTimeZone("UTC"));
-        Date result = null;
-        
-        try {
-			result = df.parse( isoDateString );
-		} catch (ParseException e) {
-			logger.error("Could not parse date : " + isoDateString + " as a ISO6801 pattern : " + e.getMessage());
-			return null;
-		}
-        return result;
-	}
 }
