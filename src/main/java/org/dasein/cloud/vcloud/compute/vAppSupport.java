@@ -486,31 +486,20 @@ public class vAppSupport extends AbstractVMSupport {
                 throw new CloudException("The maximum name length is 128: '" + basename + "' is " + basename.length());
             }
 
-            final String vmId;
-            Node vmNode = vmNodes.item(0);
-
-            if( vmNode != null && vmNode.hasAttributes() ) {
-                Node vmHref = vmNode.getAttributes().getNamedItem("href");
-                if( vmHref != null ) {
-                    String vmUrl = vmHref.getNodeValue().trim();
-                    vmId = ((vCloud)getProvider()).toID(vmUrl);
-                }
-                else {
-                    vmId = null;
-                }
-            }
-            else {
-                vmId = null;
-            }
-
+            String vmId = parseVmId(vmNodes);
             if( vmId == null ) {
-                try {
-                    undeploy(vappId);
-                    method.delete("vApp", vappId);
-                } catch( Throwable t ) {
-                    logger.error("Problem backing out after no virtual machines exist in response: " + t.getMessage());
+                //Sometimes the vApp response comes back before the VM is included in it
+                //Attempting a single (for the moment) retry in this case but may want to add a loop (potentially doing Thread.sleep) around the retry
+                vmId = retryListvApp(method, vappId, nsString);
+                if(vmId == null){
+                    try {
+                        undeploy(vappId);
+                        method.delete("vApp", vappId);
+                    } catch( Throwable t ) {
+                        logger.error("Problem backing out after no virtual machines exist in response: " + t.getMessage());
+                    }
+                    throw new CloudException("No virtual machines exist in response");
                 }
-                throw new CloudException("No virtual machines exist in response");
             }
             VirtualMachine vm = getVirtualMachine(vmId);
 
@@ -524,6 +513,7 @@ public class vAppSupport extends AbstractVMSupport {
                 throw new CloudException("Unable to identify VM " + vmId + ".");
             }
 
+            final String fvmId = vmId;
             Thread t = new Thread() {
                 public void run() {
                     try {
@@ -534,7 +524,7 @@ public class vAppSupport extends AbstractVMSupport {
                         }
                         metadata.put("dsnImageId", img.getProviderMachineImageId());
                         metadata.put("dsnCreated", String.valueOf(System.currentTimeMillis()));
-                        method.postMetaData("vApp", vmId, metadata);
+                        method.postMetaData("vApp", fvmId, metadata);
                     }
                     catch( Throwable warn ) {
                         logger.warn("Error updating meta-data on launch: " + warn.getMessage());
@@ -846,6 +836,33 @@ public class vAppSupport extends AbstractVMSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    private String parseVmId(NodeList vmNodes){
+        String vmId = "";
+        Node vmNode = vmNodes.item(0);
+
+        if( vmNode != null && vmNode.hasAttributes() ) {
+            Node vmHref = vmNode.getAttributes().getNamedItem("href");
+            if( vmHref != null ) {
+                String vmUrl = vmHref.getNodeValue().trim();
+                vmId = ((vCloud)getProvider()).toID(vmUrl);
+            }
+            else {
+                vmId = null;
+            }
+        }
+        else {
+            vmId = null;
+        }
+        return vmId;
+    }
+
+    private String retryListvApp(vCloudMethod method, String vappId, String nsString) throws CloudException, InternalException{
+        String retryResponse = method.get("vApp", vappId);
+        final Document retryDoc = method.parseXML(retryResponse);
+        String vmId = parseVmId(retryDoc.getElementsByTagName(nsString + "Vm"));
+        return vmId;
     }
 
     private String parseCustomizationScript(@Nonnull Node vm) {
