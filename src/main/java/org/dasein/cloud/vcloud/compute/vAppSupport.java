@@ -1148,23 +1148,52 @@ public class vAppSupport extends AbstractVMSupport {
                 if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
                 NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
 
-                for( int i=0; i<nodes.getLength(); i++ ) {
-                    Node node = nodes.item(i);
-                    if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
-                    else nsString = "";
+                if(nodes.getLength() > 0){
+                    for( int i=0; i<nodes.getLength(); i++ ) {
+                        Node node = nodes.item(i);
+                        if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                        else nsString = "";
 
-                    if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
-                        Node rel = node.getAttributes().getNamedItem("rel");
+                        if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
+                            Node rel = node.getAttributes().getNamedItem("rel");
 
-                        if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:reboot") ) {
-                            Node href = node.getAttributes().getNamedItem("href");
+                            if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:reboot") ) {
+                                Node href = node.getAttributes().getNamedItem("href");
 
-                            if( href != null ) {
-                                String endpoint = href.getNodeValue().trim();
-                                String action = method.getAction(endpoint);
+                                if( href != null ) {
+                                    String endpoint = href.getNodeValue().trim();
+                                    String action = method.getAction(endpoint);
 
-                                method.post(action, endpoint, null, null);
-                                break;
+                                    method.post(action, endpoint, null, null);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                else{
+                    nodes = doc.getElementsByTagName(nsString + "Vm");
+                    if(nodes.getLength() > 0){
+                        Node vmNode = nodes.item(0);
+                        if(vmNode != null && vmNode.hasChildNodes()){
+                            NodeList links = vmNode.getChildNodes();
+                            for(int i=0;i<links.getLength();i++){
+                                Node link = links.item(i);
+                                if(link.getNodeName().equalsIgnoreCase(nsString + "Link") && link.hasAttributes()){
+                                    Node rel = link.getAttributes().getNamedItem("rel");
+
+                                    if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:reboot") ) {
+                                        Node href = link.getAttributes().getNamedItem("href");
+
+                                        if( href != null ) {
+                                            String endpoint = href.getNodeValue().trim();
+                                            String action = method.getAction(endpoint);
+
+                                            method.post(action, endpoint, null, null);
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
