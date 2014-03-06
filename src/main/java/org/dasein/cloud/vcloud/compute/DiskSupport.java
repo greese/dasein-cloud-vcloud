@@ -22,7 +22,6 @@ import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
-import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.AbstractVolumeSupport;
 import org.dasein.cloud.compute.Platform;
@@ -44,7 +43,6 @@ import org.w3c.dom.NodeList;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -199,13 +197,8 @@ public class DiskSupport extends AbstractVolumeSupport {
     }
 
     @Override
-    public int getMaximumVolumeCount() throws InternalException, CloudException {
-        return -2;
-    }
-
-    @Override
-    public Storage<Gigabyte> getMaximumVolumeSize() throws InternalException, CloudException {
-        return null;
+    public @Nonnull DiskCapabilities getCapabilities() {
+        return new DiskCapabilities((vCloud)getProvider());
     }
 
     @Override
@@ -235,16 +228,6 @@ public class DiskSupport extends AbstractVolumeSupport {
     }
 
     @Override
-    public @Nonnull Requirement getVolumeProductRequirement() throws InternalException, CloudException {
-        return Requirement.NONE;
-    }
-
-    @Override
-    public boolean isVolumeSizeDeterminedByProduct() throws InternalException, CloudException {
-        return false;
-    }
-
-    @Override
     public @Nonnull Iterable<String> listPossibleDeviceIds(@Nonnull Platform platform) throws InternalException, CloudException {
         ArrayList<String> ids = new ArrayList<String>();
 
@@ -254,11 +237,6 @@ public class DiskSupport extends AbstractVolumeSupport {
             }
         }
         return ids;
-    }
-
-    @Override
-    public @Nonnull Iterable<VolumeFormat> listSupportedFormats() throws InternalException, CloudException {
-        return Collections.singletonList(VolumeFormat.BLOCK);
     }
 
     @Override

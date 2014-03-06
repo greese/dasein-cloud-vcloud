@@ -24,6 +24,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.compute.AbstractImageSupport;
 import org.dasein.cloud.compute.Architecture;
+import org.dasein.cloud.compute.ImageCapabilities;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.ImageCreateOptions;
 import org.dasein.cloud.compute.ImageFilterOptions;
@@ -333,6 +334,11 @@ public class TemplateSupport extends AbstractImageSupport {
     }
 
     @Override
+    public ImageCapabilities getCapabilities() throws CloudException, InternalException {
+        return new TemplateCapabilities((vCloud)getProvider());
+    }
+
+    @Override
     public MachineImage getImage(@Nonnull String providerImageId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "Image.getImage");
         try {
@@ -585,11 +591,6 @@ public class TemplateSupport extends AbstractImageSupport {
             lock.unlock();
             APITrace.end();
         }
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImageFormat> listSupportedFormats() throws CloudException, InternalException {
-        return Collections.singletonList(MachineImageFormat.VMDK);
     }
 
     @Override
@@ -1006,20 +1007,5 @@ public class TemplateSupport extends AbstractImageSupport {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public boolean supportsCustomImages() {
-        return true;
-    }
-
-    @Override
-    public boolean supportsImageCapture(@Nonnull MachineImageType type) {
-        return type.equals(MachineImageType.VOLUME);
-    }
-
-    @Override
-    public boolean supportsPublicLibrary(@Nonnull ImageClass cls) {
-        return cls.equals(ImageClass.MACHINE);
     }
 }

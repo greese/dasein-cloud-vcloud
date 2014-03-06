@@ -21,14 +21,13 @@ package org.dasein.cloud.vcloud.compute;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.Requirement;
 import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
-import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
+import org.dasein.cloud.compute.VirtualMachineCapabilities;
 import org.dasein.cloud.compute.VirtualMachineProduct;
 import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.dc.DataCenter;
@@ -79,7 +78,7 @@ import java.util.UUID;
  * @version 2013.07
  * @since 2013.04
  */
-public class vAppSupport extends AbstractVMSupport {
+public class vAppSupport extends AbstractVMSupport<vCloud> {
     static private final Logger logger = vCloud.getLogger(vAppSupport.class);
 
     static public final String PARENT_VAPP_ID = "parentVAppId";
@@ -91,7 +90,7 @@ public class vAppSupport extends AbstractVMSupport {
     public void deploy(@Nonnull String vmId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.deploy");
         try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
             String xml = method.get("vApp", vmId);
 
             if( xml != null ) {
@@ -136,24 +135,8 @@ public class vAppSupport extends AbstractVMSupport {
     }
 
     @Override
-    public int getCostFactor(@Nonnull VmState state) throws InternalException, CloudException {
-        if( !state.equals(VmState.RUNNING) ) {
-            return 0;
-        }
-        return 100;
-    }
-
-    @Override
-    public int getMaximumVirtualMachineCount() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "VM.getMaximumVirtualMachineCount");
-        try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-
-            return method.getVMQuota();
-        }
-        finally {
-            APITrace.end();
-        }
+    public @Nonnull VirtualMachineCapabilities getCapabilities() throws InternalException, CloudException {
+        return new vAppCapabilities(getProvider());
     }
 
     public @Nullable VirtualMachineProduct getProduct(@Nonnull String productId) throws InternalException, CloudException {
@@ -184,13 +167,8 @@ public class vAppSupport extends AbstractVMSupport {
         }
     }
 
-    @Override
-    public @Nonnull String getProviderTermForServer(@Nonnull Locale locale) {
-        return "VM";
-    }
-
     private @Nullable String getVDC(@Nonnull String vappId) throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", vappId);
 
         if( xml == null || xml.equals("") ) {
@@ -284,41 +262,6 @@ public class vAppSupport extends AbstractVMSupport {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public @Nonnull Requirement identifyImageRequirement(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        return (cls.equals(ImageClass.MACHINE) ? Requirement.REQUIRED : Requirement.NONE);
-    }
-
-    @Override
-    public @Nonnull Requirement identifyPasswordRequirement(Platform platform) throws CloudException, InternalException {
-        return Requirement.OPTIONAL;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyRootVolumeRequirement() throws CloudException, InternalException {
-        return Requirement.NONE;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyShellKeyRequirement(Platform platform) throws CloudException, InternalException {
-        return Requirement.NONE;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyStaticIPRequirement() throws CloudException, InternalException {
-        return Requirement.NONE;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyVlanRequirement() throws CloudException, InternalException {
-        return Requirement.REQUIRED;
-    }
-
-    @Override
-    public boolean isAPITerminationPreventable() throws CloudException, InternalException {
-        return false;
     }
 
     @Override
@@ -1012,22 +955,6 @@ public class vAppSupport extends AbstractVMSupport {
     }
 
     @Override
-    public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
-        Cache<Architecture> cache = Cache.getInstance(getProvider(), "architectures", Architecture.class, CacheLevel.CLOUD);
-        Iterable<Architecture> list = cache.get(getContext());
-
-        if( list == null) {
-            ArrayList<Architecture> a = new ArrayList<Architecture>();
-
-            a.add(Architecture.I32);
-            a.add(Architecture.I64);
-            list = a;
-            cache.put(getContext(), Collections.unmodifiableList(a));
-        }
-        return list;
-    }
-
-    @Override
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
         getProvider().hold();
         PopulatorThread<VirtualMachine> populator = new PopulatorThread<VirtualMachine>(new JiteratorPopulator<VirtualMachine>() {
@@ -1431,16 +1358,6 @@ public class vAppSupport extends AbstractVMSupport {
     }
 
     @Override
-    public boolean supportsStartStop(@Nonnull VirtualMachine vm) {
-        return true;
-    }
-
-    @Override
-    public boolean supportsSuspendResume(@Nonnull VirtualMachine vm) {
-        return true;
-    }
-
-    @Override
     public void suspend(@Nonnull String vmId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.suspend");
         try {
@@ -1521,7 +1438,7 @@ public class vAppSupport extends AbstractVMSupport {
                     break;
                 }
             }
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
 
             if( count == 1 && contains ) {
                 try { undeploy(vappId); }
@@ -1641,7 +1558,7 @@ public class vAppSupport extends AbstractVMSupport {
         vm.setProviderDataCenterId(vdcId);
 
         if( n != null ) {
-            vm.setProviderVirtualMachineId(((vCloud)getProvider()).toID(n.getNodeValue().trim()));
+            vm.setProviderVirtualMachineId((getProvider()).toID(n.getNodeValue().trim()));
         }
         n = vmNode.getAttributes().getNamedItem("status");
         if( n != null ) {
@@ -1681,7 +1598,7 @@ public class vAppSupport extends AbstractVMSupport {
                 }
             }
             else if( attribute.getNodeName().equalsIgnoreCase("DateCreated") && attribute.hasChildNodes() ) {
-                vm.setCreationTimestamp(((vCloud)getProvider()).parseTime(attribute.getFirstChild().getNodeValue().trim()));
+                vm.setCreationTimestamp((getProvider()).parseTime(attribute.getFirstChild().getNodeValue().trim()));
             }
             else if( attribute.getNodeName().equalsIgnoreCase("NetworkConnectionSection") && attribute.hasChildNodes() ) {
                 NodeList elements = attribute.getChildNodes();
@@ -1715,7 +1632,7 @@ public class vAppSupport extends AbstractVMSupport {
 
                             if( net != null ) {
                                 String netNameOrId = net.getNodeValue().trim();
-                                boolean compat = ((vCloud)getProvider()).isCompat();
+                                boolean compat = (getProvider()).isCompat();
 
                                 for( VLAN vlan : vlans ) {
                                     boolean matches = false;
@@ -1880,7 +1797,7 @@ public class vAppSupport extends AbstractVMSupport {
             }
         }
         try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+            vCloudMethod method = new vCloudMethod(getProvider());
             String xml = method.get("vApp", vm.getProviderVirtualMachineId() + "/metadata");
 
             if( xml != null && !xml.equals("") ) {
@@ -1940,7 +1857,7 @@ public class vAppSupport extends AbstractVMSupport {
      * @throws InternalException
      */
     public void undeploy(@Nonnull String vmId, String powerAction) throws CloudException, InternalException {
-        vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+        vCloudMethod method = new vCloudMethod(getProvider());
         String xml = method.get("vApp", vmId);
 
         if( xml != null ) {
@@ -2028,4 +1945,6 @@ public class vAppSupport extends AbstractVMSupport {
         }
         return str.toString();
     }
+
+
 }
