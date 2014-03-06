@@ -18,6 +18,7 @@
 
 package org.dasein.cloud.vcloud;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
@@ -95,7 +96,7 @@ import java.util.TreeSet;
  * @author George Reese
  */
 public class vCloudMethod {
-    static public final String[] VERSIONS = { "5.1", "1.5", "1.0", "0.9", "0.8" };
+    static public final String[] VERSIONS = { "5.6", "5.1", "1.5", "1.0", "0.9", "0.8" };
 
     static public final String CAPTURE_VAPP     = "captureVApp";
     static public final String COMPOSE_VAPP     = "composeVApp";
@@ -437,6 +438,28 @@ public class vCloudMethod {
 
                 org.version = getVersion();
                 method.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
+
+                try {
+                    String password = new String(ctx.getAccessPrivate(), "utf-8");
+                    String userName;
+
+                    if( matches(getAPIVersion(), "0.8", "0.8") ) {
+                        userName = new String(ctx.getAccessPublic(), "utf-8");
+                    }
+                    else if( getAPIVersion().equals("5.6") ) {
+                        userName = new String(ctx.getAccessPublic(), "utf-8");
+                    }
+                    else {
+                        userName = new String(ctx.getAccessPublic(), "utf-8") + "@" + ctx.getAccountNumber();
+                    }
+                    String auth = new String(Base64.encodeBase64((userName + ":" + password).getBytes()));
+
+                    method.addHeader("Authorization", "Basic " + auth);
+                }
+                catch( UnsupportedEncodingException e ) {
+                    throw new InternalException(e);
+                }
+
 
                 if( wire.isDebugEnabled() ) {
                     wire.debug(method.getRequestLine().toString());
@@ -956,7 +979,7 @@ public class vCloudMethod {
         if( ctx == null ) {
             throw new CloudException("No context was defined for this request");
         }
-        String endpoint = ctx.getEndpoint();
+        String endpoint = ctx.getCloud().getEndpoint();
 
         if( endpoint == null ) {
             throw new CloudException("No cloud endpoint was defined");
@@ -1192,14 +1215,24 @@ public class vCloudMethod {
                 return it.next();
             }
         }
+        // TODO: how does vCHS do version discovery?
+        if( ctx.getCloud().getEndpoint().startsWith("https://vchs") ) {
+            // This is a complete hack that needs to be changed to reflect vCHS version discovery
+            Version version = new Version();
+
+            version.loginUrl = ctx.getCloud().getEndpoint() + "/api/vchs/sessions";
+            version.version = "5.6";
+            cache.put(ctx, Collections.singletonList(version));
+            return version;
+        }
         if( wire.isDebugEnabled() ) {
             wire.debug("");
-            wire.debug(">>> [GET (" + (new Date()) + ")] -> " + ctx.getEndpoint() + " >--------------------------------------------------------------------------------------");
+            wire.debug(">>> [GET (" + (new Date()) + ")] -> " + ctx.getCloud().getEndpoint() + " >--------------------------------------------------------------------------------------");
         }
         try {
             final String[] preferred = provider.getVersionPreference();
             HttpClient client = getClient(false);
-            HttpGet method =  new HttpGet(ctx.getEndpoint() + "/api/versions");
+            HttpGet method =  new HttpGet(ctx.getCloud().getEndpoint() + "/api/versions");
 
             if( wire.isDebugEnabled() ) {
                 wire.debug(method.getRequestLine().toString());
@@ -1320,6 +1353,7 @@ public class vCloudMethod {
                 }
             }
             else {
+
                 logger.error("Expected OK for GET request, got " + status.getStatusCode());
                 String xml = null;
 
