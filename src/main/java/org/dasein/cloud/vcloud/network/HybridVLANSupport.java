@@ -21,10 +21,7 @@ package org.dasein.cloud.vcloud.network;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.dc.DataCenter;
-import org.dasein.cloud.network.AbstractVLANSupport;
-import org.dasein.cloud.network.IPVersion;
-import org.dasein.cloud.network.VLAN;
-import org.dasein.cloud.network.VLANState;
+import org.dasein.cloud.network.*;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
@@ -38,10 +35,7 @@ import org.w3c.dom.NodeList;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Locale;
+import java.util.*;
 
 /**
  * Implements support for vCloud networking.
@@ -51,8 +45,13 @@ import java.util.Locale;
  * @since 2013.04
  */
 public class HybridVLANSupport extends AbstractVLANSupport {
+
+    private volatile transient HybridVLANCapabilities capabilities;
+    private vCloud provider;
+
     HybridVLANSupport(@Nonnull vCloud provider) {
         super(provider);
+        this.provider = provider;
     }
 
     @Override
@@ -65,6 +64,14 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     public @Nonnull VLAN createVlan(@Nonnull String cidr, @Nonnull String name, @Nonnull String description, @Nonnull String domainName, @Nonnull String[] dnsServers, @Nonnull String[] ntpServers) throws CloudException, InternalException {
         // TODO: implement me
         return super.createVlan(cidr, name, description, domainName, dnsServers, ntpServers);
+    }
+
+    @Override
+    public VLANCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new HybridVLANCapabilities(provider);
+        }
+        return capabilities;
     }
 
     @Override
@@ -115,6 +122,18 @@ public class HybridVLANSupport extends AbstractVLANSupport {
         }
     }
 
+    @Nullable
+    @Override
+    public String getAttachedInternetGatewayId(@Nonnull String s) throws CloudException, InternalException {
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public InternetGateway getInternetGatewayById(@Nonnull String s) throws CloudException, InternalException {
+        return null;
+    }
+
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.isSubscribed");
@@ -129,6 +148,12 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     @Override
     public boolean isVlanDataCenterConstrained() throws CloudException, InternalException {
         return true;
+    }
+
+    @Nonnull
+    @Override
+    public Collection<InternetGateway> listInternetGateways(@Nullable String s) throws CloudException, InternalException {
+        return null;
     }
 
     @Override
@@ -194,6 +219,11 @@ public class HybridVLANSupport extends AbstractVLANSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    @Override
+    public void removeInternetGatewayById(@Nonnull String s) throws CloudException, InternalException {
+
     }
 
     private @Nullable VLAN toVlan(@Nonnull String vdcId, @Nonnull String id) throws InternalException, CloudException {

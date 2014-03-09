@@ -22,15 +22,7 @@ import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.Requirement;
-import org.dasein.cloud.compute.AbstractVMSupport;
-import org.dasein.cloud.compute.Architecture;
-import org.dasein.cloud.compute.ImageClass;
-import org.dasein.cloud.compute.MachineImage;
-import org.dasein.cloud.compute.Platform;
-import org.dasein.cloud.compute.VMLaunchOptions;
-import org.dasein.cloud.compute.VirtualMachine;
-import org.dasein.cloud.compute.VirtualMachineProduct;
-import org.dasein.cloud.compute.VmState;
+import org.dasein.cloud.compute.*;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.network.VLAN;
@@ -83,6 +75,7 @@ public class vAppSupport extends AbstractVMSupport {
     static private final Logger logger = vCloud.getLogger(vAppSupport.class);
 
     static public final String PARENT_VAPP_ID = "parentVAppId";
+    private VMSupportCapabilities capabilities;
 
     vAppSupport(@Nonnull vCloud provider) {
         super(provider);
@@ -154,6 +147,15 @@ public class vAppSupport extends AbstractVMSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    @Nonnull
+    @Override
+    public VirtualMachineCapabilities getCapabilities() throws InternalException, CloudException {
+        if( capabilities == null ) {
+            capabilities = new VMSupportCapabilities((vCloud) getProvider());
+        }
+        return capabilities;
     }
 
     public @Nullable VirtualMachineProduct getProduct(@Nonnull String productId) throws InternalException, CloudException {

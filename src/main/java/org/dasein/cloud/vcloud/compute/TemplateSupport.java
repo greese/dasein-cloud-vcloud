@@ -22,18 +22,7 @@ import org.apache.log4j.Logger;
 import org.dasein.cloud.AsynchronousTask;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.compute.AbstractImageSupport;
-import org.dasein.cloud.compute.Architecture;
-import org.dasein.cloud.compute.ImageClass;
-import org.dasein.cloud.compute.ImageCreateOptions;
-import org.dasein.cloud.compute.ImageFilterOptions;
-import org.dasein.cloud.compute.MachineImage;
-import org.dasein.cloud.compute.MachineImageFormat;
-import org.dasein.cloud.compute.MachineImageState;
-import org.dasein.cloud.compute.MachineImageType;
-import org.dasein.cloud.compute.Platform;
-import org.dasein.cloud.compute.VirtualMachine;
-import org.dasein.cloud.compute.VmState;
+import org.dasein.cloud.compute.*;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
@@ -74,6 +63,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class TemplateSupport extends AbstractImageSupport {
     static private final Logger logger = vCloud.getLogger(TemplateSupport.class);
     static private final Lock lockCreationLock = new ReentrantLock();
+    private TemplateSupportCapabilities capabilities;
 
     static public class Catalog {
         public String catalogId;
@@ -330,6 +320,14 @@ public class TemplateSupport extends AbstractImageSupport {
 
         }
         return null;
+    }
+
+    @Override
+    public ImageCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new TemplateSupportCapabilities((vCloud) getProvider());
+        }
+        return capabilities;
     }
 
     @Override
