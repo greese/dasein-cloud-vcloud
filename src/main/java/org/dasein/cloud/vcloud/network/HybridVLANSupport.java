@@ -22,11 +22,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.dc.DataCenter;
-import org.dasein.cloud.network.AbstractVLANSupport;
-import org.dasein.cloud.network.IPVersion;
-import org.dasein.cloud.network.InternetGateway;
-import org.dasein.cloud.network.VLAN;
-import org.dasein.cloud.network.VLANState;
+import org.dasein.cloud.network.*;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
@@ -40,11 +36,7 @@ import org.w3c.dom.NodeList;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Locale;
+import java.util.*;
 
 /**
  * Implements support for vCloud networking.
@@ -54,8 +46,13 @@ import java.util.Locale;
  * @since 2013.04
  */
 public class HybridVLANSupport extends AbstractVLANSupport {
+
+    private volatile transient HybridVLANCapabilities capabilities;
+    private vCloud provider;
+
     HybridVLANSupport(@Nonnull vCloud provider) {
         super(provider);
+        this.provider = provider;
     }
 
     @Override
@@ -65,8 +62,11 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     }
 
     @Override
-    public @Nonnull HybridVLANCapabilities getCapabilities() {
-        return new HybridVLANCapabilities((vCloud)getProvider());
+    public VLANCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new HybridVLANCapabilities(provider);
+        }
+        return capabilities;
     }
 
     @Override
@@ -125,9 +125,10 @@ public class HybridVLANSupport extends AbstractVLANSupport {
         }
     }
 
+    @Nonnull
     @Override
-    public @Nonnull Collection<InternetGateway> listInternetGateways(@Nullable String vlanId) throws CloudException, InternalException {
-        return Collections.emptyList();
+    public Collection<InternetGateway> listInternetGateways(@Nullable String s) throws CloudException, InternalException {
+        return null;
     }
 
     @Override
@@ -191,8 +192,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     }
 
     @Override
-    public void removeInternetGatewayById(@Nonnull String id) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("No internet gateways, no removal");
+    public void removeInternetGatewayById(@Nonnull String s) throws CloudException, InternalException {
     }
 
     private @Nullable VLAN toVlan(@Nonnull String vdcId, @Nonnull String id) throws InternalException, CloudException {

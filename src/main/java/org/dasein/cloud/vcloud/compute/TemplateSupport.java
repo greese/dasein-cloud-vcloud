@@ -75,6 +75,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class TemplateSupport extends AbstractImageSupport {
     static private final Logger logger = vCloud.getLogger(TemplateSupport.class);
     static private final Lock lockCreationLock = new ReentrantLock();
+    private TemplateSupportCapabilities capabilities;
 
     static public class Catalog {
         public String catalogId;
@@ -335,7 +336,10 @@ public class TemplateSupport extends AbstractImageSupport {
 
     @Override
     public ImageCapabilities getCapabilities() throws CloudException, InternalException {
-        return new TemplateCapabilities((vCloud)getProvider());
+        if( capabilities == null ) {
+            capabilities = new TemplateSupportCapabilities((vCloud) getProvider());
+        }
+        return capabilities;
     }
 
     @Override
