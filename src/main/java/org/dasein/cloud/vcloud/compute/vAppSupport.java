@@ -433,6 +433,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             if( vmId == null ) {
                 //Sometimes the vApp response comes back before the VM is included in it
                 //Attempting a single (for the moment) retry in this case but may want to add a loop (potentially doing Thread.sleep) around the retry
+                logger.error("Grabbed the vApp response before the VM was included - retrying");
                 vmId = retryListvApp(method, vappId, nsString);
                 if(vmId == null){
                     try {
@@ -955,6 +956,22 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     }
 
     @Override
+    public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
+        Cache<Architecture> cache = Cache.getInstance(getProvider(), "architectures", Architecture.class, CacheLevel.CLOUD);
+        Iterable<Architecture> list = cache.get(getContext());
+
+        if( list == null) {
+            ArrayList<Architecture> a = new ArrayList<Architecture>();
+
+            a.add(Architecture.I32);
+            a.add(Architecture.I64);
+            list = a;
+            cache.put(getContext(), Collections.unmodifiableList(a));
+        }
+        return list;
+    }
+
+    @Override
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
         getProvider().hold();
         PopulatorThread<VirtualMachine> populator = new PopulatorThread<VirtualMachine>(new JiteratorPopulator<VirtualMachine>() {
@@ -1075,23 +1092,52 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 if(docElementTagName.contains(":"))nsString = docElementTagName.substring(0, docElementTagName.indexOf(":") + 1);
                 NodeList nodes = doc.getElementsByTagName(nsString + "VApp");
 
-                for( int i=0; i<nodes.getLength(); i++ ) {
-                    Node node = nodes.item(i);
-                    if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
-                    else nsString = "";
+                if(nodes.getLength() > 0){
+                    for( int i=0; i<nodes.getLength(); i++ ) {
+                        Node node = nodes.item(i);
+                        if(node.getNodeName().contains(":"))nsString = node.getNodeName().substring(0, node.getNodeName().indexOf(":") + 1);
+                        else nsString = "";
 
-                    if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
-                        Node rel = node.getAttributes().getNamedItem("rel");
+                        if( node.getNodeName().equalsIgnoreCase(nsString + "Link") && node.hasAttributes() ) {
+                            Node rel = node.getAttributes().getNamedItem("rel");
 
-                        if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:reboot") ) {
-                            Node href = node.getAttributes().getNamedItem("href");
+                            if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:reboot") ) {
+                                Node href = node.getAttributes().getNamedItem("href");
 
-                            if( href != null ) {
-                                String endpoint = href.getNodeValue().trim();
-                                String action = method.getAction(endpoint);
+                                if( href != null ) {
+                                    String endpoint = href.getNodeValue().trim();
+                                    String action = method.getAction(endpoint);
 
-                                method.post(action, endpoint, null, null);
-                                break;
+                                    method.post(action, endpoint, null, null);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                else{
+                    nodes = doc.getElementsByTagName(nsString + "Vm");
+                    if(nodes.getLength() > 0){
+                        Node vmNode = nodes.item(0);
+                        if(vmNode != null && vmNode.hasChildNodes()){
+                            NodeList links = vmNode.getChildNodes();
+                            for(int i=0;i<links.getLength();i++){
+                                Node link = links.item(i);
+                                if(link.getNodeName().equalsIgnoreCase(nsString + "Link") && link.hasAttributes()){
+                                    Node rel = link.getAttributes().getNamedItem("rel");
+
+                                    if( rel != null && rel.getNodeValue().trim().equalsIgnoreCase("power:reboot") ) {
+                                        Node href = link.getAttributes().getNamedItem("href");
+
+                                        if( href != null ) {
+                                            String endpoint = href.getNodeValue().trim();
+                                            String action = method.getAction(endpoint);
+
+                                            method.post(action, endpoint, null, null);
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

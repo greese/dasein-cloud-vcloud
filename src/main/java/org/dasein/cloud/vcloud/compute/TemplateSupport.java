@@ -594,6 +594,11 @@ public class TemplateSupport extends AbstractImageSupport {
     }
 
     @Override
+    public @Nonnull Iterable<MachineImageFormat> listSupportedFormats() throws CloudException, InternalException {
+        return Collections.singletonList(MachineImageFormat.VMDK);
+    }
+
+    @Override
     public @Nonnull Iterable<String> listShares(@Nonnull String forMachineImageId) throws CloudException, InternalException {
         return Collections.emptyList();
     }
@@ -1007,5 +1012,20 @@ public class TemplateSupport extends AbstractImageSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    @Override
+    public boolean supportsCustomImages() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsImageCapture(@Nonnull MachineImageType type) {
+        return type.equals(MachineImageType.VOLUME);
+    }
+
+    @Override
+    public boolean supportsPublicLibrary(@Nonnull ImageClass cls) {
+        return cls.equals(ImageClass.MACHINE);
     }
 }

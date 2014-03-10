@@ -459,8 +459,6 @@ public class vCloudMethod {
                 catch( UnsupportedEncodingException e ) {
                     throw new InternalException(e);
                 }
-
-
                 if( wire.isDebugEnabled() ) {
                     wire.debug(method.getRequestLine().toString());
                     for( Header header : method.getAllHeaders() ) {
