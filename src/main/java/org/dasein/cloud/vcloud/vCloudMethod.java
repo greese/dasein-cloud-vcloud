@@ -700,13 +700,14 @@ public class vCloudMethod {
         try {
             Org org = authenticate(false);
             String endpoint = toURL(resource, id);
+            HttpClient client = null;
 
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug(">>> [DELETE (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
             }
             try {
-                HttpClient client = getClient(false);
+                client = getClient(false);
                 HttpDelete delete = new HttpDelete(endpoint);
 
                 delete.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
@@ -808,6 +809,9 @@ public class vCloudMethod {
                 }
             }
             finally {
+                if(client != null){
+                    client.getConnectionManager().shutdown();
+                }
                 if( wire.isDebugEnabled() ) {
                     wire.debug("<<< [DELETE (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
                     wire.debug("");
@@ -829,13 +833,14 @@ public class vCloudMethod {
         try {
             Org org = authenticate(false);
             String endpoint = toURL(resource, id);
+            HttpClient client = null;
 
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug(">>> [GET (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
             }
             try {
-                HttpClient client = getClient(false);
+                client = getClient(false);
                 HttpGet get = new HttpGet(endpoint);
 
                 get.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
@@ -947,6 +952,10 @@ public class vCloudMethod {
                 }
             }
             finally {
+                if(client != null){
+                    client.getConnectionManager().shutdown();
+                }
+
                 if( wire.isDebugEnabled() ) {
                     wire.debug("<<< [GET (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
                     wire.debug("");
@@ -1808,13 +1817,14 @@ public class vCloudMethod {
             logger.trace("ENTER: " + vCloudMethod.class.getName() + ".post(" + endpoint + ")");
         }
         try {
+            HttpClient client = null;
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug(">>> [POST (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
             }
             try {
                 Org org = authenticate(false);
-                HttpClient client = getClient(false);
+                client = getClient(false);
                 HttpPost post = new HttpPost(endpoint);
 
                 post.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
@@ -1939,6 +1949,9 @@ public class vCloudMethod {
                 }
             }
             finally {
+                if(client != null){
+                    client.getConnectionManager().shutdown();
+                }
                 if( wire.isDebugEnabled() ) {
                     wire.debug("<<< [POST (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
                     wire.debug("");
@@ -1983,13 +1996,14 @@ public class vCloudMethod {
             logger.trace("ENTER: " + vCloudMethod.class.getName() + ".put(" + endpoint + ")");
         }
         try {
+            HttpClient client = null;
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug(">>> [PUT (" + (new Date()) + ")] -> " + endpoint + " >--------------------------------------------------------------------------------------");
             }
             try {
                 Org org = authenticate(false);
-                HttpClient client = getClient(false);
+                client = getClient(false);
                 HttpPut put = new HttpPut(endpoint);
 
                 put.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
@@ -2115,6 +2129,9 @@ public class vCloudMethod {
                 }
             }
             finally {
+                if(client != null){
+                    client.getConnectionManager().shutdown();
+                }
                 if( wire.isDebugEnabled() ) {
                     wire.debug("<<< [PUT (" + (new Date()) + ")] -> " + endpoint + " <--------------------------------------------------------------------------------------");
                     wire.debug("");
