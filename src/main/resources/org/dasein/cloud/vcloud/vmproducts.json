@@ -5,102 +5,723 @@
         "products":[
             {
                 "architectures":["I32", "I64"],
-                "id":"t1.micro",
-                "name":"Micro Instance (t1.micro)",
-                "description":"Micro Instance (t1.micro)",
+                "id":"1:1024",
+                "name":"1:1024",
+                "description":"1:1024",
                 "cpuCount":1,
-                "rootVolumeSizeInGb":1,
-                "ramSizeInMb":512
-            },
-            {
-                "architectures":["I32", "I64"],
-                "id":"m1.small",
-                "name":"Small Instance (m1.small)",
-                "description":"Small Instance (m1.small)",
-                "cpuCount":1,
-                "rootVolumeSizeInGb":1,
+                "rootVolumeSizeInGb":20,
                 "ramSizeInMb":1024
             },
             {
                 "architectures":["I32", "I64"],
-                "id":"m1.medium",
-                "name":"Medium Instance (m1.medium)",
-                "description":"Medium Instance (m1.medium)",
+                "id":"2:1024",
+                "name":"2:1024",
+                "description":"2:1024",
                 "cpuCount":2,
-                "rootVolumeSizeInGb":410,
-                "ramSizeInMb": 3584
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":1024
             },
             {
-                "architectures":["I64"],
-                "id":"c1.medium",
-                "name":"High-CPU Medium Instance (c1.medium)",
-                "description":"High-CPU Medium Instance (c1.medium)",
-                "cpuCount":5,
-                "rootVolumeSizeInGb":350,
-                "ramSizeInMb":1536
+                "architectures":["I32", "I64"],
+                "id":"3:1024",
+                "name":"3:1024",
+                "description":"3:1024",
+                "cpuCount":3,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":1024
             },
             {
-                "architectures":["I64"],
-                "id":"m1.large",
-                "name":"Large Instance (m1.large)",
-                "description":"Large Instance (m1.large)",
+                "architectures":["I32", "I64"],
+                "id":"4:1024",
+                "name":"4:1024",
+                "description":"4:1024",
                 "cpuCount":4,
-                "rootVolumeSizeInGb":850,
-                "ramSizeInMb":7168
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":1024
             },
             {
-                "architectures":["I64"],
-                "id":"m1.xlarge",
-                "name":"Extra Large Instance (m1.xlarge)",
-                "description":"Extra Large Instance (m1.xlarge)",
-                "cpuCount":8,
-                "rootVolumeSizeInGb":1690,
-                "ramSizeInMb":16000
+                "architectures":["I32", "I64"],
+                "id":"5:1024",
+                "name":"5:1024",
+                "description":"5:1024",
+                "cpuCount":5,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":1024
             },
             {
-                "architectures":["I64"],
-                "id":"c1.xlarge",
-                "name":"High-CPU Extra Large Instance (c1.xlarge)",
-                "description":"High-CPU Extra Large Instance (c1.xlarge)",
-                "cpuCount":20,
-                "rootVolumeSizeInGb":1690,
-                "ramSizeInMb":7168
+                "architectures":["I32", "I64"],
+                "id":"6:1024",
+                "name":"6:1024",
+                "description":"6:1024",
+                "cpuCount":6,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":1024
             },
             {
-                "architectures":["I64"],
-                "id":"m2.xlarge",
-                "name":"High-Memory Extra Large Instance (m2.xlarge)",
-                "description":"High-Memory Extra Large Instance (m2.xlarge)",
+                "architectures":["I32", "I64"],
+                "id":"7:1024",
+                "name":"7:1024",
+                "description":"7:1024",
                 "cpuCount":7,
-                "rootVolumeSizeInGb":420,
-                "ramSizeInMb":17024
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":1024
             },
             {
-                "architectures":["I64"],
-                "id":"m2.2xlarge",
-                "name":"High-Memory Double Extra Large Instance (m2.2xlarge)",
-                "description":"High-Memory Double Extra Large Instance (m2.2xlarge)",
-                "cpuCount":13,
-                "rootVolumeSizeInGb":850,
-                "ramSizeInMb":34200
+                "architectures":["I32", "I64"],
+                "id":"8:1024",
+                "name":"8:1024",
+                "description":"8:1024",
+                "cpuCount":8,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":1024
             },
             {
-                "architectures":["I64"],
-                "id":"m2.4xlarge",
-                "name":"High-Memory Quadruple Extra Large Instance (m2.4xlarge)",
-                "description":"High-Memory Quadruple Extra Large Instance (m2.4xlarge)",
-                "cpuCount":26,
-                "rootVolumeSizeInGb":1690,
-                "ramSizeInMb":68400
+                "architectures":["I32", "I64"],
+                "id":"1:2048",
+                "name":"1:2048",
+                "description":"1:2048",
+                "cpuCount":1,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":2048
             },
             {
-                "architectures":["I64"],
-                "id":"cc1.4xlarge",
-                "name":"Cluster Compute Quadruple Extra Large (cc1.4xlarge)",
-                "description":"Cluster Compute Quadruple Extra Large (cc1.4xlarge)",
-                "cpuCount":34,
-                "rootVolumeSizeInGb":1690,
-                "ramSizeInMb":23000
+                "architectures":["I32", "I64"],
+                "id":"2:2048",
+                "name":"2:2048",
+                "description":"2:2048",
+                "cpuCount":2,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":2048
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"3:2048",
+                "name":"3:2048",
+                "description":"3:2048",
+                "cpuCount":3,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":2048
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"4:2048",
+                "name":"4:2048",
+                "description":"4:2048",
+                "cpuCount":4,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":2048
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"5:2048",
+                "name":"5:2048",
+                "description":"5:2048",
+                "cpuCount":5,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":2048
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"6:2048",
+                "name":"6:2048",
+                "description":"6:2048",
+                "cpuCount":6,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":2048
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"7:2048",
+                "name":"7:2048",
+                "description":"7:2048",
+                "cpuCount":7,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":2048
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"8:2048",
+                "name":"8:2048",
+                "description":"8:2048",
+                "cpuCount":8,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":2048
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"1:4096",
+                "name":"1:4096",
+                "description":"1:4096",
+                "cpuCount":1,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":4096
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"2:4096",
+                "name":"2:4096",
+                "description":"2:4096",
+                "cpuCount":2,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":4096
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"3:4096",
+                "name":"3:4096",
+                "description":"3:4096",
+                "cpuCount":3,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":4096
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"4:4096",
+                "name":"4:4096",
+                "description":"4:4096",
+                "cpuCount":4,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":4096
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"5:4096",
+                "name":"5:4096",
+                "description":"5:4096",
+                "cpuCount":5,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":4096
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"6:4096",
+                "name":"6:4096",
+                "description":"6:4096",
+                "cpuCount":6,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":4096
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"7:4096",
+                "name":"7:4096",
+                "description":"7:4096",
+                "cpuCount":7,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":4096
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"8:4096",
+                "name":"8:4096",
+                "description":"8:4096",
+                "cpuCount":8,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":4096
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"1:8192",
+                "name":"1:8192",
+                "description":"1:8192",
+                "cpuCount":1,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":8192
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"2:8192",
+                "name":"2:8192",
+                "description":"2:8192",
+                "cpuCount":2,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":8192
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"3:8192",
+                "name":"3:8192",
+                "description":"3:8192",
+                "cpuCount":3,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":8192
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"4:8192",
+                "name":"4:8192",
+                "description":"4:8192",
+                "cpuCount":4,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":8192
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"5:8192",
+                "name":"5:8192",
+                "description":"5:8192",
+                "cpuCount":5,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":8192
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"6:8192",
+                "name":"6:8192",
+                "description":"6:8192",
+                "cpuCount":6,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":8192
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"7:8192",
+                "name":"7:8192",
+                "description":"7:8192",
+                "cpuCount":7,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":8192
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"8:8192",
+                "name":"8:8192",
+                "description":"8:8192",
+                "cpuCount":8,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":8192
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"1:12288",
+                "name":"1:12288",
+                "description":"1:12288",
+                "cpuCount":1,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":12288
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"2:12288",
+                "name":"2:12288",
+                "description":"2:12288",
+                "cpuCount":2,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":12288
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"3:12288",
+                "name":"3:12288",
+                "description":"3:12288",
+                "cpuCount":3,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":12288
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"4:12288",
+                "name":"4:12288",
+                "description":"4:12288",
+                "cpuCount":4,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":12288
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"5:12288",
+                "name":"5:12288",
+                "description":"5:12288",
+                "cpuCount":5,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":12288
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"6:12288",
+                "name":"6:12288",
+                "description":"6:12288",
+                "cpuCount":6,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":12288
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"7:12288",
+                "name":"7:12288",
+                "description":"7:12288",
+                "cpuCount":7,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":12288
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"8:12288",
+                "name":"8:12288",
+                "description":"8:12288",
+                "cpuCount":8,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":12288
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"1:16384",
+                "name":"1:16384",
+                "description":"1:16384",
+                "cpuCount":1,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":16384
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"2:16384",
+                "name":"2:16384",
+                "description":"2:16384",
+                "cpuCount":2,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":16384
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"3:16384",
+                "name":"3:16384",
+                "description":"3:16384",
+                "cpuCount":3,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":16384
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"4:16384",
+                "name":"4:16384",
+                "description":"4:16384",
+                "cpuCount":4,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":16384
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"5:16384",
+                "name":"5:16384",
+                "description":"5:16384",
+                "cpuCount":5,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":16384
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"6:16384",
+                "name":"6:16384",
+                "description":"6:16384",
+                "cpuCount":6,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":16384
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"7:16384",
+                "name":"7:16384",
+                "description":"7:16384",
+                "cpuCount":7,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":16384
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"8:16384",
+                "name":"8:16384",
+                "description":"8:16384",
+                "cpuCount":8,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":16384
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"1:20480",
+                "name":"1:20480",
+                "description":"1:20480",
+                "cpuCount":1,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":20480
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"2:20480",
+                "name":"2:20480",
+                "description":"2:20480",
+                "cpuCount":2,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":20480
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"3:20480",
+                "name":"3:20480",
+                "description":"3:20480",
+                "cpuCount":3,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":20480
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"4:20480",
+                "name":"4:20480",
+                "description":"4:20480",
+                "cpuCount":4,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":20480
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"5:20480",
+                "name":"5:20480",
+                "description":"5:20480",
+                "cpuCount":5,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":20480
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"6:20480",
+                "name":"6:20480",
+                "description":"6:20480",
+                "cpuCount":6,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":20480
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"7:20480",
+                "name":"7:20480",
+                "description":"7:20480",
+                "cpuCount":7,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":20480
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"8:20480",
+                "name":"8:20480",
+                "description":"8:20480",
+                "cpuCount":8,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":20480
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"1:24576",
+                "name":"1:24576",
+                "description":"1:24576",
+                "cpuCount":1,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":24576
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"2:24576",
+                "name":"2:24576",
+                "description":"2:24576",
+                "cpuCount":2,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":24576
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"3:24576",
+                "name":"3:24576",
+                "description":"3:24576",
+                "cpuCount":3,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":24576
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"4:24576",
+                "name":"4:24576",
+                "description":"4:24576",
+                "cpuCount":4,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":24576
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"5:24576",
+                "name":"5:24576",
+                "description":"5:24576",
+                "cpuCount":5,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":24576
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"6:24576",
+                "name":"6:24576",
+                "description":"6:24576",
+                "cpuCount":6,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":24576
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"7:24576",
+                "name":"7:24576",
+                "description":"7:24576",
+                "cpuCount":7,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":24576
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"8:24576",
+                "name":"8:24576",
+                "description":"8:24576",
+                "cpuCount":8,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":24576
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"1:28668",
+                "name":"1:28668",
+                "description":"1:28668",
+                "cpuCount":1,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":28668
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"2:28668",
+                "name":"2:28668",
+                "description":"2:28668",
+                "cpuCount":2,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":28668
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"3:28668",
+                "name":"3:28668",
+                "description":"3:28668",
+                "cpuCount":3,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":28668
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"4:28668",
+                "name":"4:28668",
+                "description":"4:28668",
+                "cpuCount":4,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":28668
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"5:28668",
+                "name":"5:28668",
+                "description":"5:28668",
+                "cpuCount":5,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":28668
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"6:28668",
+                "name":"6:28668",
+                "description":"6:28668",
+                "cpuCount":6,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":28668
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"7:28668",
+                "name":"7:28668",
+                "description":"7:28668",
+                "cpuCount":7,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":28668
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"8:28668",
+                "name":"8:28668",
+                "description":"8:28668",
+                "cpuCount":8,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":28668
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"1:32768",
+                "name":"1:32768",
+                "description":"1:32768",
+                "cpuCount":1,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":32768
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"2:32768",
+                "name":"2:32768",
+                "description":"2:32768",
+                "cpuCount":2,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":32768
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"3:32768",
+                "name":"3:32768",
+                "description":"3:32768",
+                "cpuCount":3,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":32768
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"4:32768",
+                "name":"4:32768",
+                "description":"4:32768",
+                "cpuCount":4,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":32768
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"5:32768",
+                "name":"5:32768",
+                "description":"5:32768",
+                "cpuCount":5,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":32768
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"6:32768",
+                "name":"6:32768",
+                "description":"6:32768",
+                "cpuCount":6,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":32768
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"7:32768",
+                "name":"7:32768",
+                "description":"7:32768",
+                "cpuCount":7,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":32768
+            },
+            {
+                "architectures":["I32", "I64"],
+                "id":"8:32768",
+                "name":"8:32768",
+                "description":"8:32768",
+                "cpuCount":8,
+                "rootVolumeSizeInGb":20,
+                "ramSizeInMb":32768
             }
         ]
     }
