@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-vcloud</artifactId>
-  <version>2014.03-SNAPSHOT</version>
+  <version>2014.03.1</version>
   <name>Dasein Cloud vCloud</name>
   <description>Dasein Cloud implementation for the vCloud API</description>
   
@@ -77,7 +77,7 @@
       <dependency>
           <groupId>org.dasein</groupId>
           <artifactId>dasein-cloud-test</artifactId>
-          <version>2014.03.2-SNAPSHOT</version>
+          <version>2014.03.1</version>
           <scope>test</scope>
           <optional>false</optional>
       </dependency>
