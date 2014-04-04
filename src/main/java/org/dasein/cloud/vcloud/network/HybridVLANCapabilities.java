@@ -1,6 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
- * See annotations for authorship information
+ * Copyright (C) 2009-2014 Dell, Inc
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
