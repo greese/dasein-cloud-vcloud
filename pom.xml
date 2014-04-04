@@ -2,11 +2,11 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-vcloud</artifactId>
-  <version>2013.07.3</version>
+  <version>2014.03.2-SNAPSHOT</version>
   <name>Dasein Cloud vCloud</name>
   <description>Dasein Cloud implementation for the vCloud API</description>
   
-  <url>http://dasein-cloud.sf.net</url>
+  <url>http://github.com/greese/dasein-cloud-aws</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -18,11 +18,11 @@
         <url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
     </license>
   </licenses>
-  
-  <organization>
-    <name>enStratus Networks Inc</name>
-    <url>http://www.enstratus.com</url>
-  </organization>
+
+    <organization>
+        <name>Dell, Inc.</name>
+        <url>http://software.dell.com</url>
+    </organization>
 
     <scm>
         <connection>scm:git:git://github.com/greese/dasein-cloud-vcloud.git</connection>
@@ -40,7 +40,7 @@
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2013.07.0</version>
+        <version>2014.03.1</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>
@@ -77,7 +77,7 @@
       <dependency>
           <groupId>org.dasein</groupId>
           <artifactId>dasein-cloud-test</artifactId>
-          <version>2013.07.1</version>
+          <version>2014.03.2-SNAPSHOT</version>
           <scope>test</scope>
           <optional>false</optional>
       </dependency>
@@ -143,8 +143,8 @@
                     <exclude>**/LICENSE-APACHE.txt</exclude>
                 </excludes>
                 <properties>
-                    <year>2009-2013</year>
-                    <copyrightHolder>enStratus Networks Inc</copyrightHolder>
+                    <year>2009-2014</year>
+                    <copyrightHolder>Dell, Inc</copyrightHolder>
                 </properties>
             </configuration>
         </plugin>
@@ -237,9 +237,9 @@
                     <value>${compat}</value>
                 </property>
             </systemProperties>
-          <includes>
-            <include>**/TestSuite.java</include>
-          </includes>
+          <excludes>
+            <exclude>**/TestSuite.java</exclude>
+          </excludes>
         </configuration>
       </plugin>     
       <plugin>
@@ -275,13 +275,13 @@
     <developer>
         <name>George Reese</name>
         <id>georgereese</id>
-        <email>george.reese -at- enstratus -dot- com</email>
+        <email>george_reese -at- dell -dot- com</email>
         <organization>enStratus</organization>
         <roles>
           <role>Java Developer</role>
           <role>PMC</role>
         </roles>
-        <url>http://www.enstratus.com</url>
+        <url>http://software.dell.com</url>
         <timezone>-6</timezone>
     </developer>  
     <developer>

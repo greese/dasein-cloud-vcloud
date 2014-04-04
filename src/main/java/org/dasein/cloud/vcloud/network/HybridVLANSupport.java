@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 enStratus Networks Inc
+ * Copyright (C) 2009-2014 Dell, Inc
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,10 +20,9 @@ package org.dasein.cloud.vcloud.network;
 
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.dc.DataCenter;
-import org.dasein.cloud.network.IPVersion;
-import org.dasein.cloud.network.VLAN;
-import org.dasein.cloud.network.VLANState;
+import org.dasein.cloud.network.*;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
@@ -37,10 +36,7 @@ import org.w3c.dom.NodeList;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Locale;
+import java.util.*;
 
 /**
  * Implements support for vCloud networking.
@@ -49,15 +45,14 @@ import java.util.Locale;
  * @version 2013.04 initial version
  * @since 2013.04
  */
-public class HybridVLANSupport extends DefunctVLAN {
+public class HybridVLANSupport extends AbstractVLANSupport {
+
+    private volatile transient HybridVLANCapabilities capabilities;
+    private vCloud provider;
+
     HybridVLANSupport(@Nonnull vCloud provider) {
         super(provider);
-    }
-
-    @Override
-    public boolean allowsNewVlanCreation() throws CloudException, InternalException {
-        // TODO: change me when implemented
-        return false;
+        this.provider = provider;
     }
 
     @Override
@@ -66,16 +61,11 @@ public class HybridVLANSupport extends DefunctVLAN {
     }
 
     @Override
-    public int getMaxVlanCount() throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "VLAN.getMaxVlanCount");
-        try {
-            vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-
-            return method.getNetworkQuota();
+    public VLANCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new HybridVLANCapabilities(provider);
         }
-        finally {
-            APITrace.end();
-        }
+        return capabilities;
     }
 
     @Override
@@ -114,6 +104,16 @@ public class HybridVLANSupport extends DefunctVLAN {
     }
 
     @Override
+    public @Nullable String getAttachedInternetGatewayId(@Nonnull String vlanId) throws CloudException, InternalException {
+        return null;
+    }
+
+    @Override
+    public @Nullable InternetGateway getInternetGatewayById(@Nonnull String gatewayId) throws CloudException, InternalException {
+        return null;
+    }
+
+    @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.isSubscribed");
         try {
@@ -124,14 +124,10 @@ public class HybridVLANSupport extends DefunctVLAN {
         }
     }
 
+    @Nonnull
     @Override
-    public boolean isVlanDataCenterConstrained() throws CloudException, InternalException {
-        return true;
-    }
-
-    @Override
-    public @Nonnull Iterable<IPVersion> listSupportedIPVersions() throws CloudException, InternalException {
-        return Collections.singletonList(IPVersion.IPV4);
+    public Collection<InternetGateway> listInternetGateways(@Nullable String s) throws CloudException, InternalException {
+        return null;
     }
 
     @Override
@@ -194,6 +190,10 @@ public class HybridVLANSupport extends DefunctVLAN {
         }
     }
 
+    @Override
+    public void removeInternetGatewayById(@Nonnull String s) throws CloudException, InternalException {
+    }
+
     private @Nullable VLAN toVlan(@Nonnull String vdcId, @Nonnull String id) throws InternalException, CloudException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
@@ -226,7 +226,7 @@ public class HybridVLANSupport extends DefunctVLAN {
         vlan.setProviderDataCenterId(vdcId);
         vlan.setProviderRegionId(getContext().getRegionId());
         vlan.setProviderOwnerId(getContext().getAccountNumber());
-        vlan.setSupportedTraffic(new IPVersion[] { IPVersion.IPV4 });
+        vlan.setSupportedTraffic(IPVersion.IPV4);
         vlan.setCurrentState(VLANState.AVAILABLE);
 
         Node n;

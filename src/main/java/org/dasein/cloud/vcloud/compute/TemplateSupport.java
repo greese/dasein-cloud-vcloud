@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 enStratus Networks Inc
+ * Copyright (C) 2009-2014 Dell, Inc
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,7 +29,7 @@ import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.Architecture;
-import org.dasein.cloud.compute.ComputeServices;
+import org.dasein.cloud.compute.ImageCapabilities;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.ImageCreateOptions;
 import org.dasein.cloud.compute.MachineImage;
@@ -82,6 +82,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class TemplateSupport implements MachineImageSupport {
     static private final Logger logger = vCloud.getLogger(TemplateSupport.class);
     static private final Lock lockCreationLock = new ReentrantLock();
+    private TemplateSupportCapabilities capabilities;
 
     static public class Catalog {
         public String catalogId;
@@ -340,6 +341,14 @@ public class TemplateSupport implements MachineImageSupport {
 
         }
         return null;
+    }
+
+    @Override
+    public ImageCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new TemplateSupportCapabilities((vCloud) getProvider());
+        }
+        return capabilities;
     }
 
     @Override

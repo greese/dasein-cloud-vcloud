@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 enStratus Networks Inc
+ * Copyright (C) 2009-2014 Dell, Inc
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,8 +22,6 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.CloudProvider;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
-import org.dasein.cloud.ProviderContext;
-import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
@@ -48,8 +46,7 @@ import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
 
 /**
@@ -290,13 +287,8 @@ public class DiskSupport implements VolumeSupport {
     }
 
     @Override
-    public int getMaximumVolumeCount() throws InternalException, CloudException {
-        return -2;
-    }
-
-    @Override
-    public Storage<Gigabyte> getMaximumVolumeSize() throws InternalException, CloudException {
-        return null;
+    public @Nonnull DiskCapabilities getCapabilities() {
+        return new DiskCapabilities((vCloud)getProvider());
     }
 
     @Override
@@ -326,16 +318,6 @@ public class DiskSupport implements VolumeSupport {
     }
 
     @Override
-    public @Nonnull Requirement getVolumeProductRequirement() throws InternalException, CloudException {
-        return Requirement.NONE;
-    }
-
-    @Override
-    public boolean isVolumeSizeDeterminedByProduct() throws InternalException, CloudException {
-        return false;
-    }
-
-    @Override
     public @Nonnull Iterable<String> listPossibleDeviceIds(@Nonnull Platform platform) throws InternalException, CloudException {
         ArrayList<String> ids = new ArrayList<String>();
 
@@ -345,17 +327,6 @@ public class DiskSupport implements VolumeSupport {
             }
         }
         return ids;
-    }
-
-    @Override
-    public @Nonnull Iterable<VolumeFormat> listSupportedFormats() throws InternalException, CloudException {
-        return Collections.singletonList(VolumeFormat.BLOCK);
-    }
-
-    @Nonnull
-    @Override
-    public Iterable<VolumeProduct> listVolumeProducts() throws InternalException, CloudException {
-        return Collections.emptyList();
     }
 
     @Override
