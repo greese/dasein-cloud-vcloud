@@ -71,27 +71,27 @@ public class VMSupportCapabilities extends AbstractCapabilities<vCloud> implemen
 
     @Override
     public boolean canResume(@Nonnull VmState fromState) throws CloudException, InternalException {
-        return true;
+        return !fromState.equals(VmState.RUNNING);
     }
 
     @Override
     public boolean canStart(@Nonnull VmState fromState) throws CloudException, InternalException {
-        return true;
+        return !fromState.equals(VmState.RUNNING);
     }
 
     @Override
     public boolean canStop(@Nonnull VmState fromState) throws CloudException, InternalException {
-        return true;
+        return !fromState.equals(VmState.STOPPED);
     }
 
     @Override
     public boolean canSuspend(@Nonnull VmState fromState) throws CloudException, InternalException {
-        return true;
+        return !fromState.equals(VmState.SUSPENDED);
     }
 
     @Override
     public boolean canTerminate(@Nonnull VmState fromState) throws CloudException, InternalException {
-        return true;
+        return !fromState.equals(VmState.TERMINATED);
     }
 
     @Override
