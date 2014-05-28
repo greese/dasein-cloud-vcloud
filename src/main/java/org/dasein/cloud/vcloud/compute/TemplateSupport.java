@@ -386,8 +386,7 @@ public class TemplateSupport implements MachineImageSupport {
             if( img == null ) {
                 return false;
             }
-            Boolean p = (Boolean)img.getTag("public");
-
+            Boolean p = Boolean.valueOf((String) img.getTag("public"));
             return (p != null && p);
         }
         finally {
