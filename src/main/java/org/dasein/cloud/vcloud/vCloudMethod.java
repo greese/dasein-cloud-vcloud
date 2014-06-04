@@ -48,6 +48,7 @@ import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
+import org.dasein.cloud.ContextRequirements;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Taggable;
@@ -85,6 +86,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeSet;
@@ -278,7 +280,6 @@ public class vCloudMethod {
             }
             catch( IOException e ) {
                 logger.error("I/O error from server communications: " + e.getMessage());
-                e.printStackTrace();
                 throw new InternalException(e);
             }
             int code = response.getStatusLine().getStatusCode();
@@ -313,7 +314,6 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    e.printStackTrace();
                     throw new CloudException(e);
                 }
             }
@@ -335,7 +335,6 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    e.printStackTrace();
                     throw new CloudException(e);
                 }
 
@@ -439,26 +438,37 @@ public class vCloudMethod {
                 org.version = getVersion();
                 method.addHeader("Accept", "application/*+xml;version=" + org.version.version + ",application/*+xml;version=" + org.version.version);
 
+                String accessPublic = null;
+                String accessPrivate = null;
                 try {
-                    String password = new String(ctx.getAccessPrivate(), "utf-8");
-                    String userName;
-
-                    if( matches(getAPIVersion(), "0.8", "0.8") ) {
-                        userName = new String(ctx.getAccessPublic(), "utf-8");
+                    List<ContextRequirements.Field> fields = provider.getContextRequirements().getConfigurableValues();
+                    for(ContextRequirements.Field f : fields ) {
+                        if(f.type.equals(ContextRequirements.FieldType.KEYPAIR)){
+                            byte[][] keyPair = (byte[][])provider.getContext().getConfigurationValue(f);
+                            accessPublic = new String(keyPair[0], "utf-8");
+                            accessPrivate = new String(keyPair[1], "utf-8");
+                        }
                     }
-                    else if( getAPIVersion().equals("5.6") ) {
-                        userName = new String(ctx.getAccessPublic(), "utf-8");
-                    }
-                    else {
-                        userName = new String(ctx.getAccessPublic(), "utf-8") + "@" + ctx.getAccountNumber();
-                    }
-                    String auth = new String(Base64.encodeBase64((userName + ":" + password).getBytes()));
-
-                    method.addHeader("Authorization", "Basic " + auth);
                 }
                 catch( UnsupportedEncodingException e ) {
                     throw new InternalException(e);
                 }
+
+                String password = accessPrivate;
+                String userName;
+
+                if( matches(getAPIVersion(), "0.8", "0.8") ) {
+                    userName = accessPublic;
+                }
+                else if( getAPIVersion().equals("5.6") ) {
+                    userName = accessPublic;
+                }
+                else {
+                    userName = accessPublic + "@" + ctx.getAccountNumber();
+                }
+                String auth = new String(Base64.encodeBase64((userName + ":" + password).getBytes()));
+
+                method.addHeader("Authorization", "Basic " + auth);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(method.getRequestLine().toString());
                     for( Header header : method.getAllHeaders() ) {
@@ -735,7 +745,6 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("I/O error from server communications: " + e.getMessage());
-                    e.printStackTrace();
                     throw new InternalException(e);
                 }
                 int code = response.getStatusLine().getStatusCode();
@@ -763,7 +772,6 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
                         throw new CloudException(e);
                     }
 
@@ -802,7 +810,6 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
                         throw new CloudException(e);
                     }
                     return xml;
@@ -869,7 +876,6 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("I/O error from server communications: " + e.getMessage());
-                    e.printStackTrace();
                     throw new InternalException(e);
                 }
                 int code = response.getStatusLine().getStatusCode();
@@ -905,7 +911,6 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
                         throw new CloudException(e);
                     }
                     return xml;
@@ -927,7 +932,6 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
                         throw new CloudException(e);
                     }
 
@@ -1047,22 +1051,32 @@ public class vCloudMethod {
             }
         }
         if( forAuthentication ) {
+            String accessPublic = null;
+            String accessPrivate = null;
             try {
-                String password = new String(ctx.getAccessPrivate(), "utf-8");
-                String userName;
-
-                if( matches(getAPIVersion(), "0.8", "0.8") ) {
-                    userName = new String(ctx.getAccessPublic(), "utf-8");
+                List<ContextRequirements.Field> fields = provider.getContextRequirements().getConfigurableValues();
+                for(ContextRequirements.Field f : fields ) {
+                    if(f.type.equals(ContextRequirements.FieldType.KEYPAIR)){
+                        byte[][] keyPair = (byte[][])provider.getContext().getConfigurationValue(f);
+                        accessPublic = new String(keyPair[0], "utf-8");
+                        accessPrivate = new String(keyPair[1], "utf-8");
+                    }
                 }
-                else {
-                    userName = new String(ctx.getAccessPublic(), "utf-8") + "@" + ctx.getAccountNumber();
-                }
-
-                client.getCredentialsProvider().setCredentials(new AuthScope(targetHost.getHostName(), targetHost.getPort()), new UsernamePasswordCredentials(userName, password));
             }
             catch( UnsupportedEncodingException e ) {
                 throw new InternalException(e);
             }
+            String password = accessPrivate;
+            String userName;
+
+            if( matches(getAPIVersion(), "0.8", "0.8") ) {
+                userName = accessPublic;
+            }
+            else {
+                userName = accessPublic + "@" + ctx.getAccountNumber();
+            }
+
+            client.getCredentialsProvider().setCredentials(new AuthScope(targetHost.getHostName(), targetHost.getPort()), new UsernamePasswordCredentials(userName, password));
         }
         return client;
     }
@@ -1377,7 +1391,6 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    e.printStackTrace();
                     throw new CloudException(e);
                 }
 
@@ -1620,7 +1633,6 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                    e.printStackTrace();
                     throw new CloudException(e);
                 }
 
@@ -1869,7 +1881,6 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("I/O error from server communications: " + e.getMessage());
-                    e.printStackTrace();
                     throw new InternalException(e);
                 }
                 int code = response.getStatusLine().getStatusCode();
@@ -1902,7 +1913,6 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
                         throw new CloudException(e);
                     }
                     return xml;
@@ -1924,7 +1934,6 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
                         throw new CloudException(e);
                     }
 
@@ -2049,7 +2058,6 @@ public class vCloudMethod {
                 }
                 catch( IOException e ) {
                     logger.error("I/O error from server communications: " + e.getMessage());
-                    e.printStackTrace();
                     throw new InternalException(e);
                 }
                 int code = response.getStatusLine().getStatusCode();
@@ -2082,7 +2090,6 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
                         throw new CloudException(e);
                     }
                     return xml;
@@ -2104,7 +2111,6 @@ public class vCloudMethod {
                     }
                     catch( IOException e ) {
                         logger.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
-                        e.printStackTrace();
                         throw new CloudException(e);
                     }
 
