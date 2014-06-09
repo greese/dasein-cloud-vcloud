@@ -21,6 +21,7 @@ package org.dasein.cloud.vcloud.network;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.*;
 import org.dasein.cloud.util.APITrace;
@@ -195,6 +196,16 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     public void removeInternetGatewayById(@Nonnull String s) throws CloudException, InternalException {
     }
 
+    @Override
+    public void removeInternetGatewayTags(@Nonnull String internetGatewayId, @Nonnull Tag... tags) throws CloudException, InternalException {
+        //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public void removeRoutingTableTags(@Nonnull String routingTableId, @Nonnull Tag... tags) throws CloudException, InternalException {
+        //To change body of implemented methods use File | Settings | File Templates.
+    }
+
     private @Nullable VLAN toVlan(@Nonnull String vdcId, @Nonnull String id) throws InternalException, CloudException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
@@ -246,8 +257,13 @@ public class HybridVLANSupport extends AbstractVLANSupport {
             vlan.setName(n.getNodeValue().trim());
             vlan.setDescription(n.getNodeValue().trim());
         }
-
         HashMap<String,String> tags = new HashMap<String, String>();
+        n = netNode.getAttributes().getNamedItem(nsString + "href");
+        if (n != null) {
+           tags.put("networkHref", n.getNodeValue().trim());
+        }
+
+
         String gateway = null;
         String netmask = null;
         boolean shared = false;
@@ -451,5 +467,15 @@ public class HybridVLANSupport extends AbstractVLANSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    @Override
+    public void updateRoutingTableTags(@Nonnull String routingTableId, @Nonnull Tag... tags) throws CloudException, InternalException {
+        //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public void updateInternetGatewayTags(@Nonnull String internetGatewayId, @Nonnull Tag... tags) throws CloudException, InternalException {
+        //To change body of implemented methods use File | Settings | File Templates.
     }
 }
