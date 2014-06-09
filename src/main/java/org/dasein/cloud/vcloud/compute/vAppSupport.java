@@ -63,7 +63,6 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -343,6 +342,71 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
 
             final VLAN vlan = ((vCloud)getProvider()).getNetworkServices().getVlanSupport().getVlan(vlanId);
             if( vlan != null ) {
+                //check image tags
+                String parentName = null, parentId = null, parentHref = null;
+                if (img.getTag("parentNetworkName") != null) {
+                   parentName =  img.getTag("parentNetworkName").toString();
+                }
+                if (img.getTag("parentNetworkId") != null) {
+                    parentId =  img.getTag("parentNetworkId").toString();
+                }
+                if (img.getTag("parentNetworkHref") != null) {
+                    parentHref =  img.getTag("parentNetworkHref").toString();
+                    if (parentHref.length()>0) {
+                        parentHref = parentHref.substring(0, parentHref.indexOf("/network/")+9);
+                    }
+                    else {
+                        logger.debug("Not found network settings in the template so getting the base href from network");
+                        parentHref = vlan.getTag("networkHref").toString();
+                        parentHref = vlan.getTag("networkHref").toString().substring(0, parentHref.indexOf("/network/")+9);
+                    }
+                }
+                else {
+                    logger.debug("Not found network settings in the template so getting the base href from network");
+                    parentHref = vlan.getTag("networkHref").toString().substring(0, parentHref.indexOf("/network/")+9);
+                }
+                if (parentName != null && !vlan.getName().equals(parentName)) {
+                    // if we don't have the parent id we need to try and find it
+                    if (parentId == null) {
+                        Iterable<VLAN> vlanList = getProvider().getNetworkServices().getVlanSupport().listVlans();
+                        while (vlanList.iterator().hasNext()) {
+                            VLAN v = vlanList.iterator().next();
+                            if (v.getName().equals(parentName)) {
+                                // found a match
+                                parentId = v.getProviderVlanId();
+                                break;
+                            }
+                        }
+                    }
+                    if (parentId == null || parentHref == null) {
+                        throw new CloudException("Unable to find the network config settings - cannot specify network for this vApp");
+                    }
+
+                    // new vapp network config
+                    xml.append("<InstantiationParams>");
+                    xml.append("<NetworkConfigSection>");
+                    xml.append("<Info xmlns=\"http://schemas.dmtf.org/ovf/envelope/1\">Configuration parameters for logical networks</Info>");
+                    xml.append("<NetworkConfig networkName=\"").append(vCloud.escapeXml(vlan.getName())).append("\">");
+                    xml.append("<Configuration>");
+                    xml.append("<ParentNetwork name=\"").append(vCloud.escapeXml(vlan.getName())).append("\"");
+                    xml.append(" id=\"").append(vlanId).append("\"");
+                    xml.append(" href=\"").append(parentHref).append(vlanId).append("\"/>");
+                    xml.append("<FenceMode>bridged</FenceMode>");
+                    xml.append("</Configuration>");
+                    xml.append("</NetworkConfig>");
+
+                    //existing network config from vapp template
+                    xml.append("<NetworkConfig networkName=\"").append(parentName).append("\">");
+                    xml.append("<Configuration>");
+                    xml.append("<ParentNetwork name=\"").append(parentName).append("\"");
+                    xml.append(" id=\"").append(parentId).append("\"");
+                    xml.append(" href=\"").append(parentHref).append(parentId).append("\"/>");
+                    xml.append("<FenceMode>bridged</FenceMode>");
+                    xml.append("</Configuration>");
+                    xml.append("</NetworkConfig>");
+                    xml.append("</NetworkConfigSection>");
+                    xml.append("</InstantiationParams>");
+                }
                 String vAppTemplateUrl = method.toURL("vAppTemplate", img.getProviderMachineImageId());
                 xml.append("<Source href=\"").append(vAppTemplateUrl).append("\"/>");
             }
