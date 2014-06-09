@@ -716,6 +716,7 @@ public class TemplateSupport implements MachineImageSupport {
         Platform platform = Platform.UNKNOWN;
         Architecture architecture = Architecture.I64;
         TagPair tagPair = null;
+        String parentNetworkHref = null, parentNetworkId = null, parentNetworkName = null;
 
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attribute = attributes.item(i);
@@ -734,6 +735,45 @@ public class TemplateSupport implements MachineImageSupport {
                     description = d;
                     if( name == null ) {
                         name = d;
+                    }
+                }
+            }
+            // need network config details
+            else if ( attribute.getNodeName().equalsIgnoreCase(nsString + "networkconfigsection") && attribute.hasChildNodes()) {
+                NodeList networkConfigs = attribute.getChildNodes();
+
+                for (int item=0; item<networkConfigs.getLength(); item++) {
+                    Node networkConfig = networkConfigs.item(item);
+
+                    if (networkConfig.getNodeName().equalsIgnoreCase(nsString + "networkconfig") && networkConfig.hasChildNodes()) {
+                        NodeList configs = networkConfig.getChildNodes();
+
+                        for (int configItem=0; configItem<configs.getLength(); configItem++) {
+                            Node config = configs.item(configItem);
+
+                            if (config.getNodeName().equalsIgnoreCase(nsString + "configuration") && config.hasChildNodes()) {
+                                NodeList c = config.getChildNodes();
+
+                                for (int conf = 0; conf<c.getLength(); conf++) {
+                                    Node conf2 = c.item(conf);
+
+                                    if (conf2.getNodeName().equalsIgnoreCase(nsString + "parentnetwork") && conf2.hasAttributes()) {
+                                        Node parentHref = conf2.getAttributes().getNamedItem("href");
+                                        Node parentId = conf2.getAttributes().getNamedItem("id");
+                                        Node parentName = conf2.getAttributes().getNamedItem("name");
+                                        if (parentHref != null) {
+                                            parentNetworkHref = parentHref.getNodeValue().trim();
+                                        }
+                                        if (parentId != null) {
+                                            parentNetworkId = parentId.getNodeValue().trim();
+                                        }
+                                        if (parentHref != null) {
+                                            parentNetworkName = parentName.getNodeValue().trim();
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -870,6 +910,9 @@ public class TemplateSupport implements MachineImageSupport {
                 image.setTag("defaultVlanNameDHCP", tagPair.defaultVlanNameDHCP);
             }
         }
+        image.setTag("parentNetworkHref", parentNetworkHref);
+        image.setTag("parentNetworkId", parentNetworkId);
+        image.setTag("parentNetworkName", parentNetworkName);
         return image;
     }
 
