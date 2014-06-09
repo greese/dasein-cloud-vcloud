@@ -248,6 +248,10 @@ public class HybridVLANSupport extends AbstractVLANSupport {
         }
 
         HashMap<String,String> tags = new HashMap<String, String>();
+        n = netNode.getAttributes().getNamedItem(nsString + "href");
+        if (n != null) {
+            tags.put("networkHref", n.getNodeValue().trim());
+        }
         String gateway = null;
         String netmask = null;
         boolean shared = false;
