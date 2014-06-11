@@ -364,6 +364,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 }
                 else {
                     logger.debug("Not found network settings in the template so getting the base href from network");
+                    parentHref = vlan.getTag("networkHref").toString();
                     parentHref = vlan.getTag("networkHref").toString().substring(0, parentHref.indexOf("/network/")+9);
                 }
                 if (parentName != null && !vlan.getName().equals(parentName)) {
