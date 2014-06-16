@@ -52,6 +52,13 @@ import org.w3c.dom.NodeList;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -707,7 +714,7 @@ public class TemplateSupport extends AbstractImageSupport {
         Platform platform = Platform.UNKNOWN;
         Architecture architecture = Architecture.I64;
         TagPair tagPair = null;
-        String parentNetworkHref = null, parentNetworkId = null, parentNetworkName = null;
+        String parentNetworkHref = null, parentNetworkId = null, parentNetworkName = null, networkConf = null;
 
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attribute = attributes.item(i);
@@ -737,6 +744,17 @@ public class TemplateSupport extends AbstractImageSupport {
                     Node networkConfig = networkConfigs.item(item);
 
                     if (networkConfig.getNodeName().equalsIgnoreCase(nsString + "networkconfig") && networkConfig.hasChildNodes()) {
+                        StringWriter sw = new StringWriter();
+                        try {
+                            Transformer t = TransformerFactory.newInstance().newTransformer();
+                            t.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+                            t.setOutputProperty(OutputKeys.INDENT, "yes");
+                            t.transform(new DOMSource(networkConfig), new StreamResult(sw));
+                        } catch (TransformerException te) {
+                            System.out.println("nodeToString Transformer Exception");
+                        }
+                        networkConf = sw.toString();
+
                         NodeList configs = networkConfig.getChildNodes();
 
                         for (int configItem=0; configItem<configs.getLength(); configItem++) {
@@ -904,6 +922,7 @@ public class TemplateSupport extends AbstractImageSupport {
         image.setTag("parentNetworkHref", parentNetworkHref);
         image.setTag("parentNetworkId", parentNetworkId);
         image.setTag("parentNetworkName", parentNetworkName);
+        image.setTag("fullNetConf", networkConf);
         return image;
     }
 
