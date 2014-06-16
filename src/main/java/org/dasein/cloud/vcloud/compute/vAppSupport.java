@@ -366,9 +366,10 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     parentHref = vlan.getTag("networkHref").toString();
                     parentHref = vlan.getTag("networkHref").toString().substring(0, parentHref.indexOf("/network/")+9);
                 }
-                if (parentName != null && !vlan.getName().equals(parentName)) {
+
+                if (parentName == null || !vlan.getName().equals(parentName)) {
                     // if we don't have the parent id we need to try and find it
-                    if (parentId == null) {
+                    if (parentId == null && parentName != null) {
                         Iterable<VLAN> vlanList = getProvider().getNetworkServices().getVlanSupport().listVlans();
                         while (vlanList.iterator().hasNext()) {
                             VLAN v = vlanList.iterator().next();
@@ -378,11 +379,10 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                                 break;
                             }
                         }
+                        if (parentId == null || parentHref == null) {
+                            throw new CloudException("Unable to find the network config settings - cannot specify network for this vApp");
+                        }
                     }
-                    if (parentId == null || parentHref == null) {
-                        throw new CloudException("Unable to find the network config settings - cannot specify network for this vApp");
-                    }
-
                     // new vapp network config
                     xml.append("<InstantiationParams>");
                     xml.append("<NetworkConfigSection>");
@@ -396,15 +396,20 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     xml.append("</Configuration>");
                     xml.append("</NetworkConfig>");
 
-                    //existing network config from vapp template
-                    xml.append("<NetworkConfig networkName=\"").append(parentName).append("\">");
-                    xml.append("<Configuration>");
-                    xml.append("<ParentNetwork name=\"").append(parentName).append("\"");
-                    xml.append(" id=\"").append(parentId).append("\"");
-                    xml.append(" href=\"").append(parentHref).append(parentId).append("\"/>");
-                    xml.append("<FenceMode>bridged</FenceMode>");
-                    xml.append("</Configuration>");
-                    xml.append("</NetworkConfig>");
+                    if (parentName != null) {
+                        //existing network config from vapp template
+                        xml.append("<NetworkConfig networkName=\"").append(parentName).append("\">");
+                        xml.append("<Configuration>");
+                        xml.append("<ParentNetwork name=\"").append(parentName).append("\"");
+                        xml.append(" id=\"").append(parentId).append("\"");
+                        xml.append(" href=\"").append(parentHref).append(parentId).append("\"/>");
+                        xml.append("<FenceMode>bridged</FenceMode>");
+                        xml.append("</Configuration>");
+                        xml.append("</NetworkConfig>");
+                    }
+                    else {
+                        xml.append(img.getTag("fullNetConf"));
+                    }
                     xml.append("</NetworkConfigSection>");
                     xml.append("</InstantiationParams>");
                 }
