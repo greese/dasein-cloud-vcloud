@@ -460,7 +460,7 @@ public class vAppSupport extends AbstractVMSupport {
                         xml.append("</Configuration>");
                         xml.append("</NetworkConfig>");
                     }
-                    else {
+                    else if (img.getTag("fullNetConf") != null && img.getTag("fullNetConf").toString().length()>0){
                         xml.append(img.getTag("fullNetConf"));
                     }
                     xml.append("</NetworkConfigSection>");
