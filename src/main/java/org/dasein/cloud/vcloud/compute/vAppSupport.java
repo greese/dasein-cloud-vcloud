@@ -474,7 +474,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             final Document doc = method.parseXML(vAppResponse);
             NodeList vmNodes = doc.getElementsByTagName(nsString + "Vm");
 
-            // vCloud has a 15 character limit on computer-name, reject upfront
+            // vCloud has a 27 character limit on computer-name, reject upfront
             final boolean multipleVMs = (vmNodes.getLength() > 1);
             if (multipleVMs) {
                 // take suffixes into account:
@@ -485,7 +485,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     } catch (Throwable t) {
                         logger.error("Problem cleaning up vApp " + vappId + ": " + t.getMessage());
                     }
-                    throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 13: '" + basename + "' is " + basename.length());
+                    throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 25: '" + basename + "' is " + basename.length());
                 }
                 if (fullname.length() > 126) {
                     try {
@@ -498,7 +498,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                 }
             } else if (basename.length() > 27) {
                 // should have been rejected already
-                throw new CloudException("The maximum name length is 15: '" + basename + "' is " + basename.length());
+                throw new CloudException("The maximum name length is 27: '" + basename + "' is " + basename.length());
             }
             else if (fullname.length() > 128) {
                 throw new CloudException("The maximum name length is 128: '" + basename + "' is " + basename.length());
