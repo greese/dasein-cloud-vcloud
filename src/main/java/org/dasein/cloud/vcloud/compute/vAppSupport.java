@@ -797,7 +797,7 @@ public class vAppSupport extends AbstractVMSupport {
                                                 xml.append("<rasd:Reservation>0</rasd:Reservation>");
                                                 xml.append("<rasd:ResourceType>3</rasd:ResourceType>");
                                                 xml.append("<rasd:VirtualQuantity>").append(String.valueOf(product.getCpuCount())).append("</rasd:VirtualQuantity>");
-                                                xml.append("<rasd:Weight>0</rasd:Weight>");
+                                                xml.append("<rasd:Weight>").append(String.valueOf(product.getCpuCount()*1000)).append("</rasd:Weight>");  //changed from 0
                                                 xml.append("<vcloud:Link href=\"").append(vmUrl).append("/virtualHardwareSection/cpu\" rel=\"edit\" type=\"application/vnd.vmware.vcloud.rasdItem+xml\"/>");
                                                 xml.append("</vcloud:Item>");
 
@@ -825,7 +825,7 @@ public class vAppSupport extends AbstractVMSupport {
                                                 xml.append("<rasd:Reservation>0</rasd:Reservation>");
                                                 xml.append("<rasd:ResourceType>4</rasd:ResourceType>");
                                                 xml.append("<rasd:VirtualQuantity>").append(String.valueOf(product.getRamSize().intValue())).append("</rasd:VirtualQuantity>");
-                                                xml.append("<rasd:Weight>0</rasd:Weight>");
+                                                xml.append("<rasd:Weight>").append(String.valueOf(product.getRamSize().intValue()*10)).append("</rasd:Weight>");
                                                 xml.append("<vcloud:Link href=\"").append(vmUrl).append("/virtualHardwareSection/memory\" rel=\"edit\" type=\"application/vnd.vmware.vcloud.rasdItem+xml\"/>");
                                                 xml.append("</vcloud:Item>");
                                                 try {
