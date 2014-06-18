@@ -286,8 +286,8 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         try {
             final String fullname = withLaunchOptions.getHostName();
             final String basename = validateHostName(withLaunchOptions.getHostName());
-            if (basename.length() > 15) {
-               throw new CloudException("The maximum name length is 15: '" + basename + "' is " + basename.length());
+            if (basename.length() > 27) {
+               throw new CloudException("The maximum name length is 27: '" + basename + "' is " + basename.length());
             }
 
             String vdcId = withLaunchOptions.getDataCenterId();
@@ -312,7 +312,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             }
             StringBuilder xml = new StringBuilder();
 
-            xml.append("<InstantiateVAppTemplateParams xmlns:ovf=\"http://schemas.dmtf.org/ovf/envelope/1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" name=\"").append(withLaunchOptions.getFriendlyName()).append(" Parent vApp\" xmlns=\"http://www.vmware.com/vcloud/v1.5\" deploy=\"false\" powerOn=\"false\">");
+            xml.append("<InstantiateVAppTemplateParams xmlns:ovf=\"http://schemas.dmtf.org/ovf/envelope/1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" name=\"").append(withLaunchOptions.getFriendlyName()).append("\" xmlns=\"http://www.vmware.com/vcloud/v1.5\" deploy=\"false\" powerOn=\"false\">");
             xml.append("<Description>").append(img.getProviderMachineImageId()).append("</Description>");
 
             String vlanId = withLaunchOptions.getVlanId();
@@ -478,7 +478,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             final boolean multipleVMs = (vmNodes.getLength() > 1);
             if (multipleVMs) {
                 // take suffixes into account:
-                if (basename.length() > 13) {
+                if (basename.length() > 25) {
                     try {
                         vCloudMethod dmethod = new vCloudMethod((vCloud)getProvider());
                         dmethod.delete("vApp", vappId);
@@ -496,7 +496,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     }
                     throw new CloudException("Because there are multiple VMs in this vApp, the maximum name length is 126: '" + basename + "' is " + basename.length());
                 }
-            } else if (basename.length() > 15) {
+            } else if (basename.length() > 27) {
                 // should have been rejected already
                 throw new CloudException("The maximum name length is 15: '" + basename + "' is " + basename.length());
             }
