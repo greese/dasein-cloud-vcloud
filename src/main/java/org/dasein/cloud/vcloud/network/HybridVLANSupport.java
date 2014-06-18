@@ -357,7 +357,7 @@ public class HybridVLANSupport extends AbstractVLANSupport {
                                             dns[idx] = ns;
                                         }
                                         catch( NumberFormatException e ) {
-                                            for(int z=0; i<dns.length; z++ ) {
+                                            for(int z=0; z<dns.length; z++ ) {
                                                 if( dns[z] == null ) {
                                                     dns[z] = ns;
                                                     break;
