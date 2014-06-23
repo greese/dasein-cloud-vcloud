@@ -220,4 +220,9 @@ public class VMSupportCapabilities extends AbstractCapabilities<vCloud> implemen
         }
         return list;
     }
+
+    @Override
+    public boolean supportsSpotVirtualMachines() throws InternalException, CloudException {
+        return false;
+    }
 }
