@@ -196,16 +196,6 @@ public class HybridVLANSupport extends AbstractVLANSupport {
     public void removeInternetGatewayById(@Nonnull String s) throws CloudException, InternalException {
     }
 
-    @Override
-    public void removeInternetGatewayTags(@Nonnull String internetGatewayId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public void removeRoutingTableTags(@Nonnull String routingTableId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        //To change body of implemented methods use File | Settings | File Templates.
-    }
-
     private @Nullable VLAN toVlan(@Nonnull String vdcId, @Nonnull String id) throws InternalException, CloudException {
         vCloudMethod method = new vCloudMethod((vCloud)getProvider());
 
@@ -467,15 +457,5 @@ public class HybridVLANSupport extends AbstractVLANSupport {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public void updateRoutingTableTags(@Nonnull String routingTableId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        //To change body of implemented methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public void updateInternetGatewayTags(@Nonnull String internetGatewayId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        //To change body of implemented methods use File | Settings | File Templates.
     }
 }
