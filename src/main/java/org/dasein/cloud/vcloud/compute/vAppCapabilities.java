@@ -213,4 +213,9 @@ public class vAppCapabilities extends AbstractCapabilities<vCloud> implements Vi
         }
         return list;
     }
+
+    @Override
+    public boolean supportsSpotVirtualMachines() throws InternalException, CloudException {
+        return false;  //To change body of implemented methods use File | Settings | File Templates.
+    }
 }
