@@ -18,10 +18,7 @@
 
 package org.dasein.cloud.vcloud.compute;
 
-import org.dasein.cloud.AbstractCapabilities;
-import org.dasein.cloud.CloudException;
-import org.dasein.cloud.InternalException;
-import org.dasein.cloud.Requirement;
+import org.dasein.cloud.*;
 import org.dasein.cloud.compute.*;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
@@ -119,69 +116,70 @@ public class VMSupportCapabilities extends AbstractCapabilities<vCloud> implemen
         return 100;
     }
 
-    @Nonnull
+
     @Override
-    public String getProviderTermForVirtualMachine(@Nonnull Locale locale) throws CloudException, InternalException {
+    public @Nonnull String getProviderTermForVirtualMachine(@Nonnull Locale locale) throws CloudException, InternalException {
         return "VM";
     }
 
-    @Nullable
+
     @Override
-    public VMScalingCapabilities getVerticalScalingCapabilities() throws CloudException, InternalException {
+    public @Nullable VMScalingCapabilities getVerticalScalingCapabilities() throws CloudException, InternalException {
         return null;
     }
 
-    @Nonnull
+
     @Override
-    public NamingConstraints getVirtualMachineNamingConstraints() throws CloudException, InternalException {
+    public @Nonnull NamingConstraints getVirtualMachineNamingConstraints() throws CloudException, InternalException {
         return NamingConstraints.getAlphaNumeric(1, 32).constrainedBy(' ', '-', '_', '.', ',', '[', ']', '(', ')', '{', '}', '~');
     }
 
-    @Nonnull
     @Override
-    public Requirement identifyDataCenterLaunchRequirement() throws CloudException, InternalException {
+    public @Nullable VisibleScope getVirtualMachineVisibleScope() {
+        return null;
+    }
+
+    @Nullable @Override public VisibleScope getVirtualMachineProductVisibleScope() {
+        return null;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyDataCenterLaunchRequirement() throws CloudException, InternalException {
         return Requirement.REQUIRED;
     }
 
-    @Nonnull
     @Override
-    public Requirement identifyImageRequirement(@Nonnull ImageClass cls) throws CloudException, InternalException {
+    public @Nonnull Requirement identifyImageRequirement(@Nonnull ImageClass cls) throws CloudException, InternalException {
         return (cls.equals(ImageClass.MACHINE) ? Requirement.REQUIRED : Requirement.NONE);
     }
 
-    @Nonnull
     @Override
-    public Requirement identifyPasswordRequirement(Platform platform) throws CloudException, InternalException {
+    public @Nonnull Requirement identifyPasswordRequirement(Platform platform) throws CloudException, InternalException {
         return Requirement.OPTIONAL;
     }
 
-    @Nonnull
     @Override
-    public Requirement identifyRootVolumeRequirement() throws CloudException, InternalException {
+    public @Nonnull Requirement identifyRootVolumeRequirement() throws CloudException, InternalException {
         return Requirement.NONE;
     }
 
-    @Nonnull
     @Override
-    public Requirement identifyShellKeyRequirement(Platform platform) throws CloudException, InternalException {
+    public @Nonnull Requirement identifyShellKeyRequirement(Platform platform) throws CloudException, InternalException {
         return Requirement.NONE;
     }
 
-    @Nonnull
     @Override
-    public Requirement identifyStaticIPRequirement() throws CloudException, InternalException {
+    public @Nonnull Requirement identifyStaticIPRequirement() throws CloudException, InternalException {
         return Requirement.NONE;
     }
 
-    @Nonnull
     @Override
-    public Requirement identifySubnetRequirement() throws CloudException, InternalException {
+    public @Nonnull Requirement identifySubnetRequirement() throws CloudException, InternalException {
         return Requirement.NONE;
     }
 
-    @Nonnull
     @Override
-    public Requirement identifyVlanRequirement() throws CloudException, InternalException {
+    public @Nonnull Requirement identifyVlanRequirement() throws CloudException, InternalException {
         return Requirement.REQUIRED;
     }
 
@@ -205,9 +203,8 @@ public class VMSupportCapabilities extends AbstractCapabilities<vCloud> implemen
         return false;
     }
 
-    @Nonnull
     @Override
-    public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
+    public @Nonnull Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
         Cache<Architecture> cache = Cache.getInstance(getProvider(), "architectures", Architecture.class, CacheLevel.CLOUD);
         Iterable<Architecture> list = cache.get(getContext());
 
