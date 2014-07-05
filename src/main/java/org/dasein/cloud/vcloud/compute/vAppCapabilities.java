@@ -18,10 +18,7 @@
 
 package org.dasein.cloud.vcloud.compute;
 
-import org.dasein.cloud.AbstractCapabilities;
-import org.dasein.cloud.CloudException;
-import org.dasein.cloud.InternalException;
-import org.dasein.cloud.Requirement;
+import org.dasein.cloud.*;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.Platform;
@@ -36,6 +33,7 @@ import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Locale;
@@ -136,6 +134,15 @@ public class vAppCapabilities extends AbstractCapabilities<vCloud> implements Vi
     @Override
     public @Nonnull NamingConstraints getVirtualMachineNamingConstraints() throws CloudException, InternalException {
         return NamingConstraints.getHostNameInstance(true).lowerCaseOnly();
+    }
+
+    @Override
+    public @Nullable VisibleScope getVirtualMachineVisibleScope() {
+        return null;
+    }
+
+    @Nullable @Override public VisibleScope getVirtualMachineProductVisibleScope() {
+        return null;
     }
 
     @Override

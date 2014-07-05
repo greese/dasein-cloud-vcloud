@@ -26,6 +26,7 @@ import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.compute.VolumeCapabilities;
 import org.dasein.cloud.compute.VolumeFormat;
+import org.dasein.cloud.util.NamingConstraints;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.util.uom.storage.Gigabyte;
 import org.dasein.util.uom.storage.Storage;
@@ -33,6 +34,7 @@ import org.dasein.util.uom.storage.Storage;
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -74,6 +76,11 @@ public class DiskCapabilities extends AbstractCapabilities<vCloud> implements Vo
     }
 
     @Override
+    public @Nonnull NamingConstraints getVolumeNamingConstraints() throws CloudException, InternalException {
+        return null; // TODO: DANGER! DANGER!
+    }
+
+    @Override
     public @Nonnull String getProviderTermForVolume(@Nonnull Locale locale) {
         return "disk";
     }
@@ -90,7 +97,7 @@ public class DiskCapabilities extends AbstractCapabilities<vCloud> implements Vo
 
     @Override
     public @Nonnull Iterable<String> listPossibleDeviceIds(@Nonnull Platform platform) throws InternalException, CloudException {
-        ArrayList<String> ids = new ArrayList<String>();
+        List<String> ids = new ArrayList<String>();
 
         for( int i=5; i<10; i++ ) {
             for( int j=0; j<10; j++ ) {
