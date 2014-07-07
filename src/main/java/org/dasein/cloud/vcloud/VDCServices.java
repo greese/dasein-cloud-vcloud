@@ -21,10 +21,7 @@ package org.dasein.cloud.vcloud;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
-import org.dasein.cloud.dc.DataCenter;
-import org.dasein.cloud.dc.DataCenterServices;
-import org.dasein.cloud.dc.Region;
-import org.dasein.cloud.dc.ResourcePool;
+import org.dasein.cloud.dc.*;
 import org.dasein.cloud.util.APITrace;
 
 import javax.annotation.Nonnull;
@@ -50,6 +47,16 @@ public class VDCServices implements DataCenterServices {
     private vCloud provider;
 
     VDCServices(vCloud provider) { this.provider = provider; }
+
+    private transient volatile VDCCapabilities capabilities;
+    @Nonnull
+    @Override
+    public DataCenterCapabilities getCapabilities() throws InternalException, CloudException {
+        if( capabilities == null ) {
+            capabilities = new VDCCapabilities(provider);
+        }
+        return capabilities;
+    }
 
     @Override
     public @Nullable DataCenter getDataCenter(@Nonnull String providerDataCenterId) throws InternalException, CloudException {
@@ -123,11 +130,6 @@ public class VDCServices implements DataCenterServices {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public boolean supportsResourcePools() {
-        return false;
     }
 
     @Override
