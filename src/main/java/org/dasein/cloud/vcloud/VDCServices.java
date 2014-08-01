@@ -141,4 +141,9 @@ public class VDCServices implements DataCenterServices {
     public ResourcePool getResourcePool(String providerResourcePoolId) throws InternalException, CloudException {
         return null;
     }
+
+    @Override
+    public Collection<StoragePool> listStoragePools() throws InternalException, CloudException {
+        return Collections.emptyList();
+    }
 }
