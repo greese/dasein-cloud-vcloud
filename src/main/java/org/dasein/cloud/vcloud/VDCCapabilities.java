@@ -26,7 +26,17 @@ public class VDCCapabilities extends AbstractCapabilities<vCloud> implements Dat
     }
 
     @Override
+    public boolean supportsAffinityGroups() {
+        return false;
+    }
+
+    @Override
     public boolean supportsResourcePools() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsStoragePools() {
         return false;
     }
 }
