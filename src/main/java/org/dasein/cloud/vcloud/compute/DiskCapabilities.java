@@ -66,6 +66,26 @@ public class DiskCapabilities extends AbstractCapabilities<vCloud> implements Vo
     }
 
     @Override
+    public int getMaximumVolumeProductIOPS() throws InternalException, CloudException {
+        return LIMIT_UNKNOWN;
+    }
+
+    @Override
+    public int getMinimumVolumeProductIOPS() throws InternalException, CloudException {
+        return LIMIT_UNKNOWN;
+    }
+
+    @Override
+    public int getMaximumVolumeSizeIOPS() throws InternalException, CloudException {
+        return LIMIT_UNKNOWN;
+    }
+
+    @Override
+    public int getMinimumVolumeSizeIOPS() throws InternalException, CloudException {
+        return LIMIT_UNKNOWN;
+    }
+
+    @Override
     public Storage<Gigabyte> getMaximumVolumeSize() throws InternalException, CloudException {
         return null;
     }

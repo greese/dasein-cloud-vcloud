@@ -222,4 +222,54 @@ public class VMSupportCapabilities extends AbstractCapabilities<vCloud> implemen
     public boolean supportsSpotVirtualMachines() throws InternalException, CloudException {
         return false;
     }
+
+    @Override
+    public boolean supportsAlterVM() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsClone() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPause() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsReboot() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsResume() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsStart() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsStop() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsSuspend() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsTerminate() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsUnPause() {
+        return false;
+    }
 }
