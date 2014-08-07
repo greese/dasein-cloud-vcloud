@@ -367,7 +367,6 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     parentHref = vlan.getTag("networkHref").toString();
                     parentHref = vlan.getTag("networkHref").toString().substring(0, parentHref.indexOf("/network/")+9);
                 }
-
                 if (parentName == null || !vlan.getName().equals(parentName)) {
                     // if we don't have the parent id we need to try and find it
                     if (parentId == null && parentName != null) {
@@ -384,6 +383,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                             throw new CloudException("Unable to find the network config settings - cannot specify network for this vApp");
                         }
                     }
+
                     // new vapp network config
                     xml.append("<InstantiationParams>");
                     xml.append("<NetworkConfigSection>");
@@ -414,6 +414,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                     xml.append("</NetworkConfigSection>");
                     xml.append("</InstantiationParams>");
                 }
+
                 String vAppTemplateUrl = method.toURL("vAppTemplate", img.getProviderMachineImageId());
                 xml.append("<Source href=\"").append(vAppTemplateUrl).append("\"/>");
             }

@@ -763,7 +763,6 @@ public class TemplateSupport implements MachineImageSupport {
                             System.out.println("nodeToString Transformer Exception");
                         }
                         networkConf = sw.toString();
-
                         NodeList configs = networkConfig.getChildNodes();
 
                         for (int configItem=0; configItem<configs.getLength(); configItem++) {

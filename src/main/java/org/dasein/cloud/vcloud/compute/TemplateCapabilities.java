@@ -18,10 +18,7 @@
 
 package org.dasein.cloud.vcloud.compute;
 
-import org.dasein.cloud.AbstractCapabilities;
-import org.dasein.cloud.CloudException;
-import org.dasein.cloud.InternalException;
-import org.dasein.cloud.Requirement;
+import org.dasein.cloud.*;
 import org.dasein.cloud.compute.ImageCapabilities;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.MachineImageFormat;
@@ -30,6 +27,7 @@ import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.vcloud.vCloud;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Collections;
 import java.util.Locale;
 
@@ -52,7 +50,6 @@ public class TemplateCapabilities extends AbstractCapabilities<vCloud> implement
     @Override
     public boolean canImage(@Nonnull VmState fromState) throws CloudException, InternalException {
         return (fromState.equals(VmState.STOPPED) || fromState.equals(VmState.PAUSED) || fromState.equals(VmState.SUSPENDED));
-
     }
 
     @Override
@@ -63,6 +60,11 @@ public class TemplateCapabilities extends AbstractCapabilities<vCloud> implement
     @Override
     public @Nonnull String getProviderTermForCustomImage(@Nonnull Locale locale, @Nonnull ImageClass imageClass) {
         return "template";
+    }
+
+    @Override
+    public @Nullable VisibleScope getImageVisibleScope() {
+        return null;
     }
 
     @Override

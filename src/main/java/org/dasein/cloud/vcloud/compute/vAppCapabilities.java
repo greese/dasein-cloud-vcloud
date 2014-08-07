@@ -18,10 +18,7 @@
 
 package org.dasein.cloud.vcloud.compute;
 
-import org.dasein.cloud.AbstractCapabilities;
-import org.dasein.cloud.CloudException;
-import org.dasein.cloud.InternalException;
-import org.dasein.cloud.Requirement;
+import org.dasein.cloud.*;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.Platform;
@@ -36,6 +33,7 @@ import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Locale;
@@ -139,6 +137,15 @@ public class vAppCapabilities extends AbstractCapabilities<vCloud> implements Vi
     }
 
     @Override
+    public @Nullable VisibleScope getVirtualMachineVisibleScope() {
+        return null;
+    }
+
+    @Nullable @Override public VisibleScope getVirtualMachineProductVisibleScope() {
+        return null;
+    }
+
+    @Override
     public @Nonnull Requirement identifyDataCenterLaunchRequirement() throws CloudException, InternalException {
         return Requirement.OPTIONAL;
     }
@@ -212,5 +219,60 @@ public class vAppCapabilities extends AbstractCapabilities<vCloud> implements Vi
             cache.put(getContext(), Collections.unmodifiableList(a));
         }
         return list;
+    }
+
+    @Override
+    public boolean supportsSpotVirtualMachines() throws InternalException, CloudException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsAlterVM() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsClone() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPause() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsReboot() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsResume() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsStart() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsStop() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsSuspend() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsTerminate() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsUnPause() {
+        return false;
     }
 }

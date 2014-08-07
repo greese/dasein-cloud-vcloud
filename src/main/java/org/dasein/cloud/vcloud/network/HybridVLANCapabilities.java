@@ -18,10 +18,7 @@
 
 package org.dasein.cloud.vcloud.network;
 
-import org.dasein.cloud.AbstractCapabilities;
-import org.dasein.cloud.CloudException;
-import org.dasein.cloud.InternalException;
-import org.dasein.cloud.Requirement;
+import org.dasein.cloud.*;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.VLANCapabilities;
 import org.dasein.cloud.util.APITrace;
@@ -29,6 +26,7 @@ import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Collections;
 import java.util.Locale;
 
@@ -121,6 +119,11 @@ public class HybridVLANCapabilities extends AbstractCapabilities<vCloud> impleme
     @Override
     public Requirement getSubnetSupport() throws CloudException, InternalException {
         return Requirement.NONE;
+    }
+
+    @Override
+    public @Nullable VisibleScope getVLANVisibleScope() {
+        return null;
     }
 
     @Nonnull
