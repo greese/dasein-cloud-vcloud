@@ -287,11 +287,9 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         final String pw = withLaunchOptions.getBootstrapPassword();
         try {
             final String fullname = withLaunchOptions.getHostName();
-            //todo
-            String basename = validateHostName(withLaunchOptions.getHostName());
+            final String basename = validateHostName(withLaunchOptions.getHostName());
             if (basename.length() > 27) {
-                basename = basename.substring(0,26);
-               //throw new CloudException("The maximum name length is 27: '" + basename + "' is " + basename.length());
+               throw new CloudException("The maximum name length is 27: '" + basename + "' is " + basename.length());
             }
 
             String vdcId = withLaunchOptions.getDataCenterId();
@@ -309,8 +307,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             }
             final VirtualMachineProduct product = getProduct(withLaunchOptions.getStandardProductId());
             final vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-            //todo
-            final MachineImage img = ((vCloud)getProvider()).getComputeServices().getImageSupport().getImage("vappTemplate-f840fdd6-ff46-43f5-b02f-178941a4b09d");
+            final MachineImage img = ((vCloud)getProvider()).getComputeServices().getImageSupport().getImage(withLaunchOptions.getMachineImageId());
 
             if( img == null ) {
                 throw new CloudException("No such image: " + withLaunchOptions.getMachineImageId());
