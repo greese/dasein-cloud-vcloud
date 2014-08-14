@@ -131,7 +131,7 @@ public class VMSupportCapabilities extends AbstractCapabilities<vCloud> implemen
 
     @Override
     public @Nonnull NamingConstraints getVirtualMachineNamingConstraints() throws CloudException, InternalException {
-        return NamingConstraints.getAlphaNumeric(1, 32).constrainedBy(' ', '-', '_', '.', ',', '[', ']', '(', ')', '{', '}', '~');
+        return NamingConstraints.getAlphaNumeric(1, 27).constrainedBy(' ', '-', '_', '.', ',', '[', ']', '(', ')', '{', '}', '~');
     }
 
     @Override

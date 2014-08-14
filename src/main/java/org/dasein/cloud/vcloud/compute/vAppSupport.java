@@ -29,6 +29,7 @@ import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineCapabilities;
 import org.dasein.cloud.compute.VirtualMachineProduct;
+import org.dasein.cloud.compute.VirtualMachineProductFilterOptions;
 import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.RawAddress;
@@ -63,6 +64,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -285,9 +287,11 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         final String pw = withLaunchOptions.getBootstrapPassword();
         try {
             final String fullname = withLaunchOptions.getHostName();
-            final String basename = validateHostName(withLaunchOptions.getHostName());
+            //todo
+            String basename = validateHostName(withLaunchOptions.getHostName());
             if (basename.length() > 27) {
-               throw new CloudException("The maximum name length is 27: '" + basename + "' is " + basename.length());
+                basename = basename.substring(0,26);
+               //throw new CloudException("The maximum name length is 27: '" + basename + "' is " + basename.length());
             }
 
             String vdcId = withLaunchOptions.getDataCenterId();
@@ -305,7 +309,8 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
             }
             final VirtualMachineProduct product = getProduct(withLaunchOptions.getStandardProductId());
             final vCloudMethod method = new vCloudMethod((vCloud)getProvider());
-            final MachineImage img = ((vCloud)getProvider()).getComputeServices().getImageSupport().getImage(withLaunchOptions.getMachineImageId());
+            //todo
+            final MachineImage img = ((vCloud)getProvider()).getComputeServices().getImageSupport().getImage("vappTemplate-f840fdd6-ff46-43f5-b02f-178941a4b09d");
 
             if( img == null ) {
                 throw new CloudException("No such image: " + withLaunchOptions.getMachineImageId());
@@ -912,11 +917,45 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
 
     @Override
     public @Nonnull Iterable<VirtualMachineProduct> listProducts(@Nonnull Architecture architecture) throws InternalException, CloudException {
+        return listProducts(null, architecture);
+    }
+
+    @Override
+    public Iterable<VirtualMachineProduct> listProducts( VirtualMachineProductFilterOptions options ) throws InternalException, CloudException {
+        List<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();
+        for( Architecture arch : getCapabilities().listSupportedArchitectures() ) {
+            mergeProductLists(products, listProducts(options, arch));
+        }
+        return products;
+    }
+
+    // Merges product iterable to the list, using providerProductId as a unique key
+    private void mergeProductLists(List<VirtualMachineProduct> to, Iterable<VirtualMachineProduct> from) {
+        List<VirtualMachineProduct> copy = new ArrayList<VirtualMachineProduct>(to);
+        for( VirtualMachineProduct productFrom : from ) {
+            boolean found = false;
+            for( VirtualMachineProduct productTo : copy ) {
+                if( productTo.getProviderProductId().equalsIgnoreCase(productFrom.getProviderProductId()) ) {
+                    found = true;
+                    break;
+                }
+            }
+            if( !found ) {
+                to.add(productFrom);
+            }
+        }
+    }
+
+    @Override
+    public Iterable<VirtualMachineProduct> listProducts(VirtualMachineProductFilterOptions options, Architecture architecture) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "listVMProducts");
         try {
-            Cache<VirtualMachineProduct> cache = Cache.getInstance(getProvider(), "products" + architecture.name(), VirtualMachineProduct.class, CacheLevel.REGION, new TimePeriod<Day>(1, TimePeriod.DAY));
+            String cacheName = "productsALL";
+            if( architecture != null ) {
+                cacheName = "products" + architecture.name();
+            }
+            Cache<VirtualMachineProduct> cache = Cache.getInstance(getProvider(), cacheName, VirtualMachineProduct.class, CacheLevel.REGION, new TimePeriod<Day>(1, TimePeriod.DAY));
             Iterable<VirtualMachineProduct> products = cache.get(getContext());
-
             if( products == null ) {
                 ArrayList<VirtualMachineProduct> list = new ArrayList<VirtualMachineProduct>();
 
@@ -973,7 +1012,8 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                             JSONObject product = plist.getJSONObject(i);
                             boolean supported = false;
 
-                            if( product.has("architectures") ) {
+                            // If architecture is specified, check if product matches
+                            if( architecture != null && product.has("architectures") ) {
                                 JSONArray architectures = product.getJSONArray("architectures");
 
                                 for( int j=0; j<architectures.length(); j++ ) {
@@ -984,10 +1024,15 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                                         break;
                                     }
                                 }
+                                if( !supported ) {
+                                    continue;
+                                }
                             }
-                            if( !supported ) {
-                                continue;
+                            else {
+                                // No architecture specified, flip the flag - all architectures allowed
+                                supported = true;
                             }
+
                             if( product.has("excludesRegions") ) {
                                 JSONArray regions = product.getJSONArray("excludesRegions");
 
@@ -1006,7 +1051,16 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                             VirtualMachineProduct prd = toProduct(product);
 
                             if( prd != null ) {
-                                list.add(prd);
+                                if( options != null) {
+                                    // Filter supplied, add matches only.
+                                    if( options.matches(prd) ) {
+                                        list.add(prd);
+                                    }
+                                }
+                                else {
+                                    // No filter supplied, add all survived.
+                                    list.add(prd);
+                                }
                             }
                         }
                     }
