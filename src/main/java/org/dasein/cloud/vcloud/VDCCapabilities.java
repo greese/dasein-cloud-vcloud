@@ -39,4 +39,9 @@ public class VDCCapabilities extends AbstractCapabilities<vCloud> implements Dat
     public boolean supportsStoragePools() {
         return false;
     }
+
+    @Override
+    public boolean supportsFolders() {
+        return false;
+    }
 }
