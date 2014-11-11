@@ -204,6 +204,11 @@ public class VMSupportCapabilities extends AbstractCapabilities<vCloud> implemen
     }
 
     @Override
+    public boolean isUserDefinedPrivateIPSupported() throws CloudException, InternalException {
+        return false; //todo supported in vcloud but not in dasein yet
+    }
+
+    @Override
     public @Nonnull Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
         Cache<Architecture> cache = Cache.getInstance(getProvider(), "architectures", Architecture.class, CacheLevel.CLOUD);
         Iterable<Architecture> list = cache.get(getContext());
