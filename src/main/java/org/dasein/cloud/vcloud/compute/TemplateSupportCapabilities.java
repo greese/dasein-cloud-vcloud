@@ -110,6 +110,11 @@ public class TemplateSupportCapabilities extends AbstractCapabilities<vCloud> im
     }
 
     @Override
+    public boolean supportsImageCopy() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
     public boolean supportsImageSharing() throws CloudException, InternalException {
         return false;
     }
