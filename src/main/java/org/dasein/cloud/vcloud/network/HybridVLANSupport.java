@@ -458,4 +458,9 @@ public class HybridVLANSupport extends AbstractVLANSupport {
             APITrace.end();
         }
     }
+
+    @Override
+    public void updateInternetGatewayTags(@Nonnull String internetGatewayId, @Nonnull Tag... tags) throws CloudException, InternalException {
+        //To change body of implemented methods use File | Settings | File Templates.
+    }
 }
