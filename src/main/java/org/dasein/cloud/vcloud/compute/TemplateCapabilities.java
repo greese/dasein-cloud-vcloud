@@ -113,6 +113,11 @@ public class TemplateCapabilities extends AbstractCapabilities<vCloud> implement
     }
 
     @Override
+    public boolean supportsListingAllRegions() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass imageClass) throws CloudException, InternalException {
         return imageClass.equals(ImageClass.MACHINE);
     }
