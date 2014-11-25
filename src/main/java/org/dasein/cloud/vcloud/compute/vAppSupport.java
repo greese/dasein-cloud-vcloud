@@ -29,6 +29,7 @@ import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineCapabilities;
 import org.dasein.cloud.compute.VirtualMachineProduct;
+import org.dasein.cloud.compute.VirtualMachineProductFilterOptions;
 import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.IPVersion;
@@ -911,11 +912,16 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         return Collections.emptyList();
     }
 
+    @Nonnull
     @Override
-    public @Nonnull Iterable<VirtualMachineProduct> listProducts(@Nonnull Architecture architecture) throws InternalException, CloudException {
+    public Iterable<VirtualMachineProduct> listProducts(@Nullable VirtualMachineProductFilterOptions options, @Nullable Architecture architecture) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "listVMProducts");
         try {
-            Cache<VirtualMachineProduct> cache = Cache.getInstance(getProvider(), "products" + architecture.name(), VirtualMachineProduct.class, CacheLevel.REGION, new TimePeriod<Day>(1, TimePeriod.DAY));
+            String cacheName = "productsALL";
+            if( architecture != null ) {
+                cacheName = "products" + architecture.name();
+            }
+            Cache<VirtualMachineProduct> cache = Cache.getInstance(getProvider(), cacheName, VirtualMachineProduct.class, CacheLevel.REGION, new TimePeriod<Day>(1, TimePeriod.DAY));
             Iterable<VirtualMachineProduct> products = cache.get(getContext());
 
             if( products == null ) {
@@ -974,7 +980,8 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                             JSONObject product = plist.getJSONObject(i);
                             boolean supported = false;
 
-                            if( product.has("architectures") ) {
+                            // If architecture is specified, check if product matches
+                            if( architecture != null && product.has("architectures") ) {
                                 JSONArray architectures = product.getJSONArray("architectures");
 
                                 for( int j=0; j<architectures.length(); j++ ) {
@@ -985,10 +992,15 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                                         break;
                                     }
                                 }
+                                if( !supported ) {
+                                    continue;
+                                }
                             }
-                            if( !supported ) {
-                                continue;
+                            else {
+                                // No architecture specified, flip the flag - all architectures allowed
+                                supported = true;
                             }
+
                             if( product.has("excludesRegions") ) {
                                 JSONArray regions = product.getJSONArray("excludesRegions");
 
@@ -1007,7 +1019,16 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
                             VirtualMachineProduct prd = toProduct(product);
 
                             if( prd != null ) {
-                                list.add(prd);
+                                if( options != null) {
+                                    // Filter supplied, add matches only.
+                                    if( options.matches(prd) ) {
+                                        list.add(prd);
+                                    }
+                                }
+                                else {
+                                    // No filter supplied, add all survived.
+                                    list.add(prd);
+                                }
                             }
                         }
                     }

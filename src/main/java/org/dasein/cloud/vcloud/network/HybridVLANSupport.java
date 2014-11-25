@@ -457,48 +457,8 @@ public class HybridVLANSupport extends AbstractVLANSupport {
         }
     }
 
-    public void setCidr(@Nonnull VLAN vlan, @Nonnull String netmask, @Nonnull String anAddress) {
-        String[] dots = netmask.split("\\.");
-        int cidr = 0;
-
-        for( String item : dots ) {
-            int x = Integer.parseInt(item);
-
-            for( ; x > 0 ; x = (x<<1)%256 ) {
-                cidr++;
-            }
-        }
-        StringBuilder network = new StringBuilder();
-
-        dots = anAddress.split("\\.");
-        int start = 0;
-
-        for( String item : dots ) {
-            if( ((start+8) < cidr) || cidr == 0 ) {
-                network.append(item);
-            }
-            else {
-                int addresses = (int)Math.pow(2, (start+8)-cidr);
-                int subnets = 256/addresses;
-                int gw = Integer.parseInt(item);
-
-                for( int i=0; i<subnets; i++ ) {
-                    int base = i*addresses;
-                    int top = ((i+1)*addresses);
-
-                    if( gw >= base && gw < top ) {
-                        network.append(String.valueOf(base));
-                        break;
-                    }
-                }
-            }
-            start += 8;
-            if( start < 32 ) {
-                network.append(".");
-            }
-        }
-        network.append("/");
-        network.append(String.valueOf(cidr));
-        vlan.setCidr(network.toString());
+    @Override
+    public void updateInternetGatewayTags(@Nonnull String internetGatewayId, @Nonnull Tag... tags) throws CloudException, InternalException {
+        //To change body of implemented methods use File | Settings | File Templates.
     }
 }

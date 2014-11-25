@@ -86,7 +86,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * @version 2013.07
  * @since 2013.04
  */
-public class TemplateSupport implements MachineImageSupport {
+public class TemplateSupport extends AbstractImageSupport<vCloud> {
     static private final Logger logger = vCloud.getLogger(TemplateSupport.class);
     static private final Lock lockCreationLock = new ReentrantLock();
     private TemplateSupportCapabilities capabilities;
