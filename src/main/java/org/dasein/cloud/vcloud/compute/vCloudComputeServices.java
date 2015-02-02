@@ -31,25 +31,23 @@ import javax.annotation.Nullable;
  * @since 2013.04
  * @version 2013.04 initial version
  */
-public class vCloudComputeServices extends AbstractComputeServices {
-    private vCloud provider;
-
+public class vCloudComputeServices extends AbstractComputeServices<vCloud> {
     public vCloudComputeServices(@Nonnull vCloud provider) {
-        this.provider = provider;
+        super(provider);
     }
 
     @Override
     public @Nonnull TemplateSupport getImageSupport() {
-        return new TemplateSupport(provider);
+        return new TemplateSupport(getProvider());
     }
 
     @Override
     public @Nonnull vAppSupport getVirtualMachineSupport() {
-        return new vAppSupport(provider);
+        return new vAppSupport(getProvider());
     }
 
     @Override
     public @Nonnull DiskSupport getVolumeSupport() {
-        return new DiskSupport(provider);
+        return new DiskSupport(getProvider());
     }
 }
