@@ -100,6 +100,9 @@ public class TemplateSupportCapabilities extends AbstractCapabilities<vCloud> im
     }
 
     @Override
+    public boolean imageCaptureDestroysVM() throws CloudException, InternalException {return false;}
+
+    @Override
     public boolean supportsDirectImageUpload() throws CloudException, InternalException {
         return false;
     }
