@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc
+ * Copyright (C) 2009-2015 Dell, Inc
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -83,7 +83,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     static private final Logger logger = vCloud.getLogger(vAppSupport.class);
 
     static public final String PARENT_VAPP_ID = "parentVAppId";
-    private VMSupportCapabilities capabilities;
+    private volatile transient VMSupportCapabilities capabilities;
 
     vAppSupport(@Nonnull vCloud provider) {
         super(provider);
@@ -140,7 +140,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
     @Override
     public VirtualMachineCapabilities getCapabilities() throws InternalException, CloudException {
         if( capabilities == null ) {
-            capabilities = new VMSupportCapabilities((vCloud) getProvider());
+            capabilities = new VMSupportCapabilities(getProvider());
         }
         return capabilities;
     }

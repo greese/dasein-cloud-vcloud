@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc
+ * Copyright (C) 2009-2015 Dell, Inc
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -98,6 +98,9 @@ public class TemplateSupportCapabilities extends AbstractCapabilities<vCloud> im
     public Iterable<MachineImageType> listSupportedImageTypes() throws CloudException, InternalException {
         return Collections.singletonList(MachineImageType.VOLUME);
     }
+
+    @Override
+    public boolean imageCaptureDestroysVM() throws CloudException, InternalException {return false;}
 
     @Override
     public boolean supportsDirectImageUpload() throws CloudException, InternalException {
