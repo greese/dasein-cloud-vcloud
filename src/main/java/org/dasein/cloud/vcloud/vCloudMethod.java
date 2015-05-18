@@ -77,6 +77,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -1133,6 +1134,10 @@ public class vCloudMethod {
     public @Nonnull String getMediaTypeForMetadata() {
         return "application/vnd.vmware.vcloud.metadata+xml";
     }
+    
+    public @Nonnull String getMediaTypeForMetadataValue() {
+        return "application/vnd.vmware.vcloud.metadata.value+xml";
+    }
 
     public @Nonnull String getMediaTypeForNetworkConnectionSection() {
         return "application/vnd.vmware.vcloud.networkConnectionSection+xml";
@@ -1975,29 +1980,88 @@ public class vCloudMethod {
     }
 
     public void postMetaData(@Nonnull String resource, @Nonnull String id, @Nonnull Map<String,Object> metadata) throws CloudException, InternalException {
-        String apiVersion = getAPIVersion();
-        StringBuilder xml = new StringBuilder();
-
-        xml.append("<Metadata xmlns=\"http://www.vmware.com/vcloud/v1.5\" ");
-        xml.append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
-        for( Map.Entry<String,Object> entry : metadata.entrySet() ) {
-            Object value = entry.getValue();
-
-            if( value != null ) {
-                xml.append("<MetadataEntry>");
-                xml.append("<Key>").append(vCloud.escapeXml(entry.getKey())).append("</Key>");
-                if( vCloudMethod.matches(apiVersion, "5.1", null) ) {
-                    xml.append("<TypedValue xsi:type=\"MetadataStringValue\">");
-                }
-                xml.append("<Value>").append(vCloud.escapeXml(value.toString())).append("</Value>");
-                if(vCloudMethod.matches(apiVersion, "5.1", null) ) {
-                    xml.append("</TypedValue>");
-                }
-                xml.append("</MetadataEntry>");
-            }
-        }
-        xml.append("</Metadata>");
-        post("metaData", toURL(resource, id) + "/metadata", getMediaTypeForMetadata(), xml.toString());
+    	APITrace.begin(provider, "Cloud.createTags");
+    	try {
+    		try {
+    			String apiVersion = getAPIVersion();
+    			StringBuilder xml = new StringBuilder();
+    			xml.append("<Metadata xmlns=\"http://www.vmware.com/vcloud/v1.5\" ");
+    			xml.append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+    			for( Map.Entry<String,Object> entry : metadata.entrySet() ) {
+    				Object value = entry.getValue();
+    				if( value != null && !value.equals("") ) {
+    					xml.append("<MetadataEntry>");
+    					xml.append("<Key>").append(vCloud.escapeXml(entry.getKey())).append("</Key>");
+    					if( vCloudMethod.matches(apiVersion, "5.1", null) ) {
+    						xml.append("<TypedValue xsi:type=\"MetadataStringValue\">");
+    					}
+    					xml.append("<Value>").append(vCloud.escapeXml(value.toString())).append("</Value>");
+    					if(vCloudMethod.matches(apiVersion, "5.1", null) ) {
+    						xml.append("</TypedValue>");
+    					}
+    					xml.append("</MetadataEntry>");
+    				}
+    			}
+    			xml.append("</Metadata>");
+    			String response = post("metaData", toURL(resource, id) + "/metadata", getMediaTypeForMetadata(), xml.toString());
+    			waitFor(response);
+    		} catch( CloudException e ) {
+    			logger.error("Error while creating tags for " + resource + " - " + id + ".", e);
+    		}
+    	} finally {
+    		APITrace.end();
+    	}
+    }
+    
+    public void putMetaData(@Nonnull String resource, @Nonnull String id, @Nonnull Map<String,Object> metadata) throws CloudException, InternalException {
+    	APITrace.begin(provider, "Cloud.updateTags");
+    	try {
+    		try {
+    			String apiVersion = getAPIVersion();
+    			for( Map.Entry<String,Object> entry : metadata.entrySet() ) {
+    				StringBuilder xml = new StringBuilder();
+    				Object value = entry.getValue();
+    				if( value != null && !value.equals("") ) {
+    					xml.append("<MetadataValue xmlns=\"http://www.vmware.com/vcloud/v1.5\" ");
+    					xml.append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+    					if( vCloudMethod.matches(apiVersion, "5.1", null) ) {
+    						xml.append("<TypedValue xsi:type=\"MetadataStringValue\">");
+    					}
+    					xml.append("<Value>").append(vCloud.escapeXml(value.toString())).append("</Value>");
+    					if(vCloudMethod.matches(apiVersion, "5.1", null) ) {
+    						xml.append("</TypedValue>");
+    					}
+    					xml.append("</MetadataValue>");
+    					String response = put("metaData", toURL(resource, id) + "/metadata/" + URLEncoder.encode(entry.getKey(), "utf-8"), getMediaTypeForMetadataValue(), xml.toString());
+    					waitFor(response);
+    				}
+    			}
+    		} catch( CloudException e ) {
+    			logger.error("Error while updating tags for " + resource + " - " + id + ".", e);
+    		} catch (UnsupportedEncodingException e) {
+    			logger.error(e);
+    		}
+    	} finally {
+    		APITrace.end();
+    	}
+    }
+    
+    public void delMetaData(@Nonnull String resource, @Nonnull String id, @Nonnull Map<String,Object> metadata) throws CloudException, InternalException {
+    	APITrace.begin(provider, "Cloud.deleteTags");
+    	try {
+    		try {
+    			for( Map.Entry<String,Object> entry : metadata.entrySet() ) {
+    				String response = delete(resource + "/" + id + "/metadata" , URLEncoder.encode(entry.getKey(), "utf-8"));
+    				waitFor(response);
+    			}
+    		} catch( CloudException e ) {
+    			logger.error("Error while deleting tags for " + resource + " - " + id + ".", e);
+    		} catch (UnsupportedEncodingException e) {
+    			logger.error(e);
+    		}
+    	} finally {
+    		APITrace.end();
+    	}
     }
 
     public @Nonnull String put(@Nonnull String action, @Nonnull String endpoint, @Nullable String contentType, @Nullable String payload) throws CloudException, InternalException {
