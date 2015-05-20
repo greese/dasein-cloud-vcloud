@@ -22,6 +22,7 @@ import org.apache.log4j.Logger;
 import org.dasein.cloud.AsynchronousTask;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractImageSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageCapabilities;
@@ -38,6 +39,7 @@ import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
+import org.dasein.cloud.util.TagUtils;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
 import org.dasein.util.CalendarWrapper;
@@ -63,7 +65,9 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.concurrent.locks.Lock;
@@ -582,6 +586,20 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
                                             if( image != null ) {
                                                 if( options == null || options.matches(image) ) {
                                                     image.setProviderOwnerId(catalog.owner);
+                                                    try {
+                                                    	String metaData = method.get("vAppTemplate", image.getProviderMachineImageId() + "/metadata");
+                                                    	if( metaData != null && !metaData.equals("") ) {
+                                                    		method.parseMetaData(image, metaData);
+                                                    	}
+                                                    }
+                                                    catch( Throwable warning ) {
+                                                    	if (logger.isDebugEnabled()) {
+                                                    		logger.warn("Failed to get and parse image metadata.", warning);
+                                                    	}
+                                                    	else {
+                                                    		logger.warn("Failed to get and parse image metadata.");
+                                                    	}
+                                                    }
                                                     image.setTag("catalogItemId", catalogItemId);
                                                     images.add(image);
                                                 }
@@ -1091,5 +1109,78 @@ public class TemplateSupport extends AbstractImageSupport<vCloud> {
     @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) {
         return cls.equals(ImageClass.MACHINE);
+    }
+    
+    @Override
+    public void setTags(@Nonnull String imageId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Image.setTags");
+    	try {
+    		vCloudMethod method = new vCloudMethod(getProvider());
+    		Tag[] collectionForDelete = TagUtils.getTagsForDelete(getImage(imageId).getTags(), tags);
+    		if (collectionForDelete.length != 0 ) {
+    			removeTags(imageId, collectionForDelete);
+    		}
+    		Map<String,Object> metadata = new HashMap<String, Object>();
+    		for( Tag tag : tags ) {
+    			metadata.put(tag.getKey(), tag.getValue());
+    		}
+    		method.postMetaData("vAppTemplate", imageId, metadata);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void setTags(@Nonnull String[] imageIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : imageIds ) {
+    		setTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String imageId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Image.updateTags");
+    	try {
+    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		Map<String,Object> metadata = new HashMap<String, Object>();
+    		for( Tag tag : tags ) {
+    			metadata.put(tag.getKey(), tag.getValue());
+    		}
+    		method.putMetaData("vAppTemplate", imageId, metadata);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String[] imageIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : imageIds ) {
+    		updateTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String imageId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Image.removeTags");
+    	try {
+    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		Map<String,Object> metadata = new HashMap<String, Object>();
+    		for( Tag tag : tags ) {
+    			metadata.put(tag.getKey(), tag.getValue());
+    		}
+    		method.delMetaData("vAppTemplate", imageId, metadata);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String[] imageIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : imageIds ) {
+    		removeTags(id, tags);
+    	}
     }
 }

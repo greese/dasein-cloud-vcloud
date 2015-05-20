@@ -21,6 +21,7 @@ package org.dasein.cloud.vcloud.compute;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.MachineImage;
@@ -37,6 +38,7 @@ import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
+import org.dasein.cloud.util.TagUtils;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudException;
 import org.dasein.cloud.vcloud.vCloudMethod;
@@ -2089,5 +2091,76 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         return str.toString();
     }
 
-
+    @Override
+    public void setTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "VM.setTags");
+    	try {
+    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		Tag[] collectionForDelete = TagUtils.getTagsForDelete(getVirtualMachine(vmId).getTags(), tags);
+    		if (collectionForDelete.length != 0 ) {
+    			removeTags(vmId, collectionForDelete);
+    		}
+    		Map<String,Object> metadata = new HashMap<String, Object>();
+    		for( Tag tag : tags ) {
+    			metadata.put(tag.getKey(), tag.getValue());
+    		}
+    		method.postMetaData("vApp", vmId, metadata);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void setTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for (String id : vmIds) {
+    		setTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void updateTags( @Nonnull String vmId, @Nonnull Tag... tags ) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "VM.updateTags");
+    	try {
+    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		Map<String,Object> metadata = new HashMap<String, Object>();
+    		for( Tag tag : tags ) {
+    			metadata.put(tag.getKey(), tag.getValue());
+    		}
+    		method.putMetaData("vApp", vmId, metadata);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void updateTags( @Nonnull String[] vmIds, @Nonnull Tag... tags ) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		updateTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void removeTags( @Nonnull String vmId, @Nonnull Tag... tags ) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "VM.removeTags");
+    	try {
+    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		Map<String,Object> metadata = new HashMap<String, Object>();
+    		for( Tag tag : tags ) {
+    			metadata.put(tag.getKey(), tag.getValue());
+    		}
+    		method.delMetaData("vApp", vmId, metadata);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void removeTags( @Nonnull String[] vmIds, @Nonnull Tag... tags ) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		removeTags(id, tags);
+    	}
+    }
 }
