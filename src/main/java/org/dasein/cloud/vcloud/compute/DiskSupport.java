@@ -23,6 +23,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractVolumeSupport;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
@@ -32,6 +33,7 @@ import org.dasein.cloud.compute.VolumeState;
 import org.dasein.cloud.compute.VolumeType;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.TagUtils;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
 import org.dasein.util.CalendarWrapper;
@@ -458,5 +460,79 @@ public class DiskSupport extends AbstractVolumeSupport {
             volume.setDescription(volume.getName());
         }
         return volume;
+    }
+    
+    @Override
+    public void setTags(@Nonnull String volumeId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Volume.setTags");
+    	try {
+    		Tag[] collectionForDelete = TagUtils.getTagsForDelete(getVolume(volumeId).getTags(), tags);
+    		if (collectionForDelete.length != 0 ) {
+    			removeTags(volumeId, collectionForDelete);
+    		}
+
+    		Map<String,Object> metadata = new HashMap<String, Object>();
+    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		for( Tag tag : tags ) {
+    			metadata.put(tag.getKey(), tag.getValue());
+    		}
+    		method.postMetaData("disk", volumeId, metadata);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void setTags(@Nonnull String[] volumeIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for (String id : volumeIds) {
+    		setTags(id, tags);
+    	}
+    }
+
+    @Override
+    public void updateTags( @Nonnull String volumeId, @Nonnull Tag... tags ) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Volume.updateTags");
+    	try {
+    		Map<String,Object> metadata = new HashMap<String, Object>();
+    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		for( Tag tag : tags ) {
+    			metadata.put(tag.getKey(), tag.getValue());
+    		}
+    		method.putMetaData("disk", volumeId, metadata);
+    	}
+    	finally {
+    		APITrace.end();
+    	}     
+    }
+
+    @Override
+    public void updateTags( @Nonnull String[] volumeIds, @Nonnull Tag... tags ) throws CloudException, InternalException {
+    	for( String id : volumeIds ) {
+    		updateTags(id, tags);
+    	}
+    }
+
+    @Override
+    public void removeTags( @Nonnull String volumeId, @Nonnull Tag... tags ) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Volume.removeTags");
+    	try {
+    		Map<String,Object> metadata = new HashMap<String, Object>();
+    		vCloudMethod method = new vCloudMethod((vCloud)getProvider());
+    		for( Tag tag : tags ) {
+    			metadata.put(tag.getKey(), tag.getValue());
+    		}
+    		method.delMetaData("disk", volumeId, metadata);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void removeTags( @Nonnull String[] volumeIds, @Nonnull Tag... tags ) throws CloudException, InternalException {
+    	for( String id : volumeIds ) {
+    		removeTags(id, tags);
+    	}
     }
 }
