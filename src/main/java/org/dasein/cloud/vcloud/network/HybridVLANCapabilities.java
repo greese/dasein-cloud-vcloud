@@ -22,6 +22,7 @@ import org.dasein.cloud.*;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.VLANCapabilities;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.NamingConstraints;
 import org.dasein.cloud.vcloud.vCloud;
 import org.dasein.cloud.vcloud.vCloudMethod;
 
@@ -161,5 +162,10 @@ public class HybridVLANCapabilities extends AbstractCapabilities<vCloud> impleme
     @Override
     public boolean supportsRawAddressRouting() throws CloudException, InternalException {
         return false;
+    }
+
+    @Override
+    public NamingConstraints getVlanNamingConstraints(){
+        return NamingConstraints.getAlphaNumeric(1, 32).constrainedBy(' ', '-', '_', '.', ',', '[', ']', '(', ')', '{', '}', '~');
     }
 }

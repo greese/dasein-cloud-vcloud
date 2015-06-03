@@ -1663,7 +1663,7 @@ public class vAppSupport extends AbstractVMSupport<vCloud> {
         return prd;
     }
 
-    private @Nonnull VmState toState(@Nonnull String status) throws CloudException {
+    private @Nonnull VmState toState(@Nonnull String status) throws CloudException, InternalException {
         try {
             int s = Integer.parseInt(status);
 
