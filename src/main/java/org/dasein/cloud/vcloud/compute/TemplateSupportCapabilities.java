@@ -20,6 +20,7 @@ package org.dasein.cloud.vcloud.compute;
 
 import org.dasein.cloud.*;
 import org.dasein.cloud.compute.*;
+import org.dasein.cloud.util.NamingConstraints;
 import org.dasein.cloud.vcloud.vCloud;
 
 import javax.annotation.Nonnull;
@@ -135,5 +136,10 @@ public class TemplateSupportCapabilities extends AbstractCapabilities<vCloud> im
     @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
         return ImageClass.MACHINE.equals(cls);
+    }
+
+    @Override
+    public NamingConstraints getImageNamingConstraints(){
+        return NamingConstraints.getAlphaNumeric(1, 32).constrainedBy(' ', '-', '_', '.', ',', '[', ']', '(', ')', '{', '}', '~');
     }
 }

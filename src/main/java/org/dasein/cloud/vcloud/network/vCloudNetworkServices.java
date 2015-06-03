@@ -30,10 +30,11 @@ import javax.annotation.Nonnull;
  * @version 2013.04 initial version
  * @since 2013.04
  */
-public class vCloudNetworkServices extends AbstractNetworkServices {
+public class vCloudNetworkServices extends AbstractNetworkServices<vCloud> {
     private vCloud provider;
 
     public vCloudNetworkServices(@Nonnull vCloud provider) {
+        super(provider);
         this.provider = provider;
     }
 

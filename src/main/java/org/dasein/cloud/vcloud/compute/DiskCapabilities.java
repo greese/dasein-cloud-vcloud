@@ -136,4 +136,9 @@ public class DiskCapabilities extends AbstractCapabilities<vCloud> implements Vo
     public @Nonnull Requirement requiresVMOnCreate() throws InternalException, CloudException {
         return Requirement.OPTIONAL;
     }
+
+    @Override
+    public Requirement getDeviceIdOnAttachRequirement(){
+        return Requirement.REQUIRED;
+    }
 }
