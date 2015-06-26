@@ -461,9 +461,11 @@ public class vCloudMethod {
                 if( matches(getAPIVersion(), "0.8", "0.8") ) {
                     userName = accessPublic;
                 }
-                else if( getAPIVersion().equals("5.6") ) {
-                    userName = accessPublic;
-                }
+                // STAS (26/06/15): below sections is commented out, because it now breaks
+                // with ScaleMatrix:
+//                else if( getAPIVersion().equals("5.6") ) {
+//                    userName = accessPublic;
+//                }
                 else {
                     userName = accessPublic + "@" + ctx.getAccountNumber();
                 }

@@ -28,15 +28,15 @@ import java.util.TimeZone;
  * The <code>ISO8601</code> utility class provides helper methods
  * to deal with date/time formatting using a specific ISO8601-compliant
  * format (see <a href="http://www.w3.org/TR/NOTE-datetime">ISO 8601</a>).
- * <p/>
+ * 
  * The currently supported format is:
  * <pre>
  *   &plusmn;YYYY-MM-DDThh:mm:ss.SSSTZD
  * </pre>
  * where:
  * <pre>
- *   &plusmn;YYYY = four-digit year with optional sign where values <= 0 are
- *           denoting years BCE and values > 0 are denoting years CE,
+ *   &plusmn;YYYY = four-digit year with optional sign where values &lt;= 0 are
+ *           denoting years BCE and values &gt; 0 are denoting years CE,
  *           e.g. -0001 denotes the year 2 BCE, 0000 denotes the year 1 BCE,
  *           0001 denotes the year 1 CE, and so on...
  *   MM    = two-digit month (01=January, etc.)
@@ -48,6 +48,7 @@ import java.util.TimeZone;
  *   TZD   = time zone designator, Z for Zulu (i.e. UTC) or an offset from UTC
  *           in the form of +hh:mm or -hh:mm
  * </pre>
+ * 
  */
 public final class ISO8601 {
     /**
